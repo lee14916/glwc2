@@ -1,0 +1,8 @@
+**/dat
+**/fig
+**/log
+**/*nohup.out
+**/*_ignore.*
+
+
+**/__pycache__
