@@ -198,13 +198,13 @@ def GEVP(Ct,t0,compQ=False):
     
 # matplotlib
 
-def getFigAxs(Nrow,Ncol,Lrow=None,Lcol=None,scale=1):
+def getFigAxs(Nrow,Ncol,Lrow=None,Lcol=None,scale=1,**kwargs):
     if (Lrow,Lcol)==(None,None):
         Lcol,Lrow=mpl.rcParams['figure.figsize']
         Lrow*=scale; Lrow*=scale
         # if (Nrow,Ncol)==(1,1):
         #     Lcol*=1.5; Lrow*=1.5
-    fig, axs = plt.subplots(Nrow, Ncol, figsize=(Lcol*Ncol, Lrow*Nrow), squeeze=False)
+    fig, axs = plt.subplots(Nrow, Ncol, figsize=(Lcol*Ncol, Lrow*Nrow), squeeze=False,**kwargs)
     return fig, axs
     
 def addRowHeader(axs,rows):
