@@ -4,13 +4,19 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import math,cmath
 import pickle
+from scipy.optimize import leastsq, curve_fit
+from scipy.linalg import solve_triangular,cholesky
+from inspect import signature
+
+flag_fast=False
 
 deepKey=lambda dic,n: dic if n==0 else deepKey(dic[list(dic.keys())[0]],n-1)
 npRound=lambda dat,n:np.round(np.array(dat).astype(float),n)
 
+
 prefactorDeep=lambda dat,prefactor:np.real(prefactor*dat) if type(dat)==np.ndarray else [prefactorDeep(ele,prefactor) for ele in dat]
 meanDeep=lambda dat:np.mean(dat,axis=0) if type(dat)==np.ndarray else [meanDeep(ele) for ele in dat]
-def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=4):
+def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,outputFlatten=False):
     '''
     - in_dat: any-dimensional list of ndarrays. Each ndarray in the list has 0-axis for cfgs
     - in_func: dat -> estimator
@@ -20,13 +26,17 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=4):
     - mean,err: estimator's format reformatted to 1d-list of 1d-arrays
     - cov: 2d-list of 2d-arrays
     '''
+    if flag_fast:
+        getNcfg=lambda dat: len(dat) if type(dat)==np.ndarray else getNcfg(dat[0])
+        n=getNcfg(in_dat)
+        d=n//300
     
     # average ${d} cfgs
     if d!=1:
         def tfunc(dat):
             if type(dat)==list:
                 return [tfunc(ele) for ele in dat]
-            shape=np.array(dat).shape
+            shape=dat.shape
             nLeft=(shape[0]//d)*d
             shape_new=(d,shape[0]//d)+shape[1:]
             return dat[:nLeft].reshape(shape_new).mean(axis=0)
@@ -62,6 +72,9 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=4):
     # Tn=func(dat); (mean,cov)=(n*Tn-(n-1)*TnBar, np.atleast_2d(np.cov(Tn1.T)*(n-1)*(n-1)/n)) # bias improvement (not suitable for fit)
     tErr=np.sqrt(np.diag(tCov))
     
+    if outputFlatten:
+        return (tMean,tErr,tCov)
+    
     # reformat
     mean=[];err=[];t=0
     for i in lenList:
@@ -75,6 +88,65 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=4):
             covI.append(tCov[t:t+i,tI:tI+j]);tI+=j
         cov.append(covI);t+=i
     return (mean,err,cov)
+
+flag_fit_cov2err=False
+def fit(dat,func,fitfunc,estimator=None,pars0=None,mask_cov=None,jk=True):
+    '''
+    dat: raw data
+    func: dat -> y_exp
+    fitfunc: par -> y_model
+    return: (mean,err,cov,chi2R,chi2R_err,Ndof)
+    '''
+    Npar=len(signature(fitfunc).parameters)
+    pars0=pars0 if pars0 is not None else [1 for i in range(Npar)]
+
+    _,_,cov0=jackknife(dat,func,outputFlatten=True)
+    if flag_fit_cov2err:
+        cov0=np.diag(np.diag(cov0))
+    if mask_cov is not None:
+        cov0=cov0*mask_cov
+    cho_L_Inv = np.linalg.inv(cholesky(cov0, lower=True))
+    Ny=len(cov0)
+    Ndof=Ny-Npar
+    
+    def tFunc(dat):
+        y_exp=np.hstack(func(dat))
+        t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
+        pars,pars_cov=leastsq(t_fitfunc,pars0,full_output=True)[:2]
+        chi2=np.sum(t_fitfunc(pars)**2)
+        return (pars,pars_cov,chi2)
+    mean,cov,chi2=tFunc(dat)
+    if estimator is None and (flag_fast or not jk):
+        if cov is None:
+            cov=np.zeros((len(mean),len(mean)))+np.inf
+        res=(mean,np.sqrt(np.diag(cov)),cov,chi2/Ndof,None,Ndof)
+        return res
+    pars0=mean
+
+    def tFunc(dat):
+        y_exp=np.hstack(func(dat))
+        t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
+        pars,_=leastsq(t_fitfunc,pars0)
+        chi2=np.sum(t_fitfunc(pars)**2)
+        return [pars if estimator is None else estimator(pars),[chi2]]    
+    mean,err,cov=jackknife(dat,tFunc)
+    
+    pars_mean,pars_err,pars_cov=mean[0],err[0],cov[0][0]
+    chi2_mean,chi2_err=mean[1][0],err[1][0]
+    chi2R_mean,chi2R_err=chi2_mean/Ndof,chi2_err/Ndof
+    res=(pars_mean,pars_err,pars_cov,chi2R_mean,chi2R_err,Ndof)
+    
+    return res
+
+def modelAvg(fits):
+    '''
+    fits=[fit]; fit=(obs_mean,obs_err,chi2R,Ndof)
+    '''
+    weights=np.exp([-(chi2R*Ndof)/2+Ndof for obs_mean,obs_err,chi2R,Ndof in fits])
+    probs=weights/np.sum(weights)
+    obs_mean_MA=np.sum(np.array([obs_mean for obs_mean,obs_err,chi2R,Ndof in fits])*probs[:,None],axis=0)
+    obs_err_MA=np.sqrt(np.sum(np.array([obs_err**2+obs_mean**2 for obs_mean,obs_err,chi2R,Ndof in fits])*probs[:,None],axis=0)-obs_mean_MA**2)
+    return (obs_mean_MA,obs_err_MA,probs)
 
 def GEVP(Ct,t0,compQ=False):
     '''
@@ -203,13 +275,13 @@ class LatticeEnsemble:
     
 # matplotlib
 
-def getFigAxs(Nrow,Ncol,Lrow=None,Lcol=None,scale=1):
+def getFigAxs(Nrow,Ncol,Lrow=None,Lcol=None,scale=1,**kwargs):
     if (Lrow,Lcol)==(None,None):
         Lcol,Lrow=mpl.rcParams['figure.figsize']
         Lrow*=scale; Lrow*=scale
         # if (Nrow,Ncol)==(1,1):
         #     Lcol*=1.5; Lrow*=1.5
-    fig, axs = plt.subplots(Nrow, Ncol, figsize=(Lcol*Ncol, Lrow*Nrow), squeeze=False)
+    fig, axs = plt.subplots(Nrow, Ncol, figsize=(Lcol*Ncol, Lrow*Nrow), squeeze=False,**kwargs)
     return fig, axs
     
 def addRowHeader(axs,rows):
@@ -217,16 +289,15 @@ def addRowHeader(axs,rows):
     for ax, row in zip(axs[:,0], rows):
         ax.annotate(row, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0),
                 xycoords=ax.yaxis.label, textcoords='offset points',
-                size='large', ha='right', va='center', fontsize=18)
+                size='large', ha='right', va='center')
         
 def addColHeader(axs,cols):
     pad=5
     for ax, col in zip(axs[0,:], cols):
         ax.annotate(col, xy=(0.5, 1), xytext=(0, pad),
                 xycoords='axes fraction', textcoords='offset points',
-                size='large', ha='center', va='baseline', fontsize=18)
-        
-        
+                size='large', ha='center', va='baseline')
+
         
 #######################################################################################
 
@@ -386,4 +457,5 @@ def getCoeMat(pt):
         t[1,int(op.split(';')[2])]=val
     return np.linalg.inv(t)
 
-gtCj={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':1,'g5':-1,'g5gx':-1,'g5gy':-1,'g5gz':-1,'g5gt':1} # gt G^dag gt = (gtCj) G
+gtCj={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':1,'g5':-1,'g5gx':-1,'g5gy':-1,'g5gz':-1,'g5gt':1,
+      'sgmxy':-1} # gt G^dag gt = (gtCj) G
