@@ -9,11 +9,12 @@ def cfg2post(cfg,case):
     return 'data_post/'+cfg+'/'+file
 
 tfList=[10,12,14]
+# gjList=['id','gx','gy','gz','gt','g5','g5gx','g5gy','g5gz','g5gt','sgmyz','sgmzx','sgmxy','sgmtx','sgmty','sgmtz']
 gjList=['id','gx','gy','gz','gt','g5','g5gx','g5gy','g5gz','g5gt']
 Format_ab=2 # 2 (4 eles) or 4 (16 eles) 
 
 Psgn={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':1,'g5':-1,'g5gx':1,'g5gy':1,'g5gz':1,'g5gt':-1,'sgmxy':1,'sgmyz':1,'sgmzx':1,'sgmtx':-1,'sgmty':-1,'sgmtz':-1}
-PTsgn={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':-1,'g5':1,'g5gx':-1,'g5gy':-1,'g5gz':-1,'g5gt':-1,'sgmxy':1,'sgmyz':1,'sgmzx':1,'sgmtx':1,'sgmty':1,'sgmtz':1} # PT symmetry acting on insertion
+PTsgn={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':-1,'g5':1,'g5gx':-1,'g5gy':-1,'g5gz':-1,'g5gt':-1,'sgmxy':1,'sgmyz':1,'sgmzx':1,'sgmtx':1,'sgmty':1,'sgmtz':1} # PT transformation acting on insertion
 gtCj={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':1,'g5':-1,'g5gx':-1,'g5gy':-1,'g5gz':-1,'g5gt':1,'sgmxy':-1,'sgmyz':-1,'sgmzx':-1,'sgmtx':1,'sgmty':1,'sgmtz':1}
 g5Cj={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':-1,'g5':1,'g5gx':1,'g5gy':1,'g5gz':1,'g5gt':1,'sgmxy':-1,'sgmyz':-1,'sgmzx':-1,'sgmtx':-1,'sgmty':-1,'sgmtz':-1}
 
@@ -59,7 +60,7 @@ diag_init=[
         [[],['pi0i'],['pi0f'],['P'],['pi0f','pi0i'], ['j'],['jPi'],['j','pi0i'],['jPf'],['pi0f','j']]],
     [['T','T_bw'],{'N','pib'},\
         [[],['pi0f'],['j']]],
-    [['B2pt','W2pt','Z2pt','B2pt_bw','W2pt_bw','Z2pt_bw'],{'N','pia','pib'},\
+    [['B2pt','W2pt','Z2pt','B2pt_bw','Z2pt_bw'],{'N','pia','pib'},\
         [[]]],
     [['NJN'],{'N','j'},\
         [[],['pi0i']]],
@@ -175,7 +176,8 @@ if __name__ == "__main__":
                 occs = {0:['N1pi1,a'],1:['N1pi0,a','N0pi1,a']}[mom2]
                 for occ in occs:
                     op=op_base+'{};{};N,pi'.format(occ,l); ops.append(op)
-    ops.sort()
+    ops+=['g;0,0,0;G1u;N0pi0,a;l1;N,pi','g;0,0,0;G1u;N0pi0,a;l2;N,pi']
+    ops.sort()    
     
     opabsDic={'post':{},'pavg':{},'avg':{}}
     # avg
