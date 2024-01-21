@@ -148,99 +148,67 @@ def modelAvg(fits):
     obs_err_MA=np.sqrt(np.sum(np.array([obs_err**2+obs_mean**2 for obs_mean,obs_err,chi2R,Ndof in fits])*probs[:,None],axis=0)-obs_mean_MA**2)
     return (obs_mean_MA,obs_err_MA,probs)
 
-def GEVP(Ct,t0,compQ=False):
+def renormalize_eVecs(eVecs):
+    '''
+    eVecs.index=(...,n,i)
+    '''
+    eVecs_inv=np.linalg.inv(eVecs)
+    eVecs_inv=eVecs_inv/np.diagonal(eVecs_inv,axis1=-2,axis2=-1)[...,None,:]
+    return np.linalg.inv(eVecs_inv)
+
+def GEVP(Ct,t0,tv=None):
     '''
     t0>=0: tRef=t0
     t0<0: tRef=t-|t0|
-    eVecs: (time,i,n)
+    eVecs: return (time,n,i) but (time,i,n) in the middle
+    tv: reference time for getting wave function (Not return wave function if tv is None) 
     Note: the e-vector is the one to combine source states.
     '''
     Ct=Ct.astype(complex)
     (t_total,N_op,N_op)=Ct.shape
-    Ct0=np.roll(Ct,-t0,axis=0) if t0<0 else np.array([Ct[t0] for t in range(t_total)])
+    if type(t0)==int:
+        if t0>=0:
+            t0=[t0 for t in range(t_total)]
+        else:
+            t0=[t+t0 if t+t0>0 else 1 for t in range(t_total)]
+    elif type(t0)==str:
+        if t0=='t/2':
+            t0=[(t+1)//2 for t in range(t_total)]
+    t0=[t0 if t!=t0 else 0 if t!=0 else 1 for t,t0 in enumerate(t0)] # we would never use t==t0 case, this is meant to avoid some warning msg
+    t0=np.array(t0)
+    Ct0=Ct[t0]
     choL=np.linalg.cholesky(Ct0) # Ct0=choL@choL.H
     choLInv=np.linalg.inv(choL)
     choLInvDag=np.conj(np.transpose(choLInv,[0,2,1]))
     w_Ct=choLInv@Ct@choLInvDag
     (eVals,w_eVecs)=np.linalg.eig(w_Ct)
     eVals=np.real(eVals)
-
-    # sorting order
-    if t0<0:
-        for t in range(t_total):
-            sortList=np.argsort(-eVals[t])
-            (eVals[t],w_eVecs[t])=(eVals[t][sortList],w_eVecs[t][:,sortList])
-    else:
-        baseSortList=np.arange(N_op)
-        tRange=list(range(t0+1,t_total))+list(range(t0,-1,-1))
-        # t0+1 case first
-        t=t0+1
-        sortList=np.argsort(-eVals[t])
+    
+    for t in range(t_total):
+        t_t0=t0[t]
+        sortList=np.argsort(-eVals[t]) if t_t0<t else np.argsort(eVals[t]) 
         (eVals[t],w_eVecs[t])=(eVals[t][sortList],w_eVecs[t][:,sortList])
-        for t in tRange[1:]:
-            sortList=np.argsort(-eVals[t]) if t>t0 else np.argsort(eVals[t])
-            (eVals[t],w_eVecs[t])=(eVals[t][sortList],w_eVecs[t][:,sortList])
 
     eVecs=choLInvDag@w_eVecs
     
-    if compQ:
-        powers=np.array([-(t+t0)/t0 for t in range(t_total)] if t0<0 else [t0/(t-t0) if t!=t0 else 9999 for t in range(t_total)])
-        t=np.conj(np.transpose(eVecs,[0,2,1]))@Ct0@eVecs
-        t=np.real(t[:,range(N_op),range(N_op)])
-        fn=np.sqrt( t / (eVals**powers[:,None]))
+    if tv is not None:
+        if type(tv)==str:
+            if tv=='t0':
+                tv=t0
+            elif tv=='t':
+                tv=range(t_total)
+        tv=np.array(tv)
+        tmp=np.conj(np.transpose(eVecs,[0,2,1]))@Ct[tv]@eVecs
+        tmp=np.real(tmp[:,range(N_op),range(N_op)])
+        powers=np.array([ t_tv/(t-t_t0) if t!=t_t0 else 0 for t,t_t0,t_tv in zip(range(t_total),t0,tv)])
+        fn=np.sqrt( tmp / (eVals**powers[:,None]))
         eVecs_normalized=eVecs/fn[:,None,:]
-        A=np.transpose(eVecs_normalized,[0,2,1]) # A_ni
-        AInv=np.linalg.inv(A) # (A^-1)_in
-        compQ=AInv
-        return (eVals,eVecs,compQ)
+        eVecs_normalized=np.transpose(eVecs_normalized,[0,2,1]) # v^n_i
+        Zin=np.linalg.inv(eVecs_normalized) # (Z)_in
+        
+        return (eVals,eVecs_normalized,Zin)
 
-    return (eVals,eVecs)
-
-# def GEVP(Ct,t0):
-#     '''
-#     Note: the e-vector is the one to combine source states.
-#     '''
-#     Ct=Ct.astype(complex)
-#     (t_total,N_op,N_op)=Ct.shape
-#     Ct0=Ct[t0]
-#     choL=np.linalg.cholesky(Ct0) # Ct0=choL@choL.H
-#     choLInv=np.linalg.inv(choL)
-#     w_Ct=choLInv@Ct@np.conj(choLInv).T # w_ denotes tranformed system
-#     (eVals,w_eVecs)=np.linalg.eig(w_Ct)
-#     eVals=np.real(eVals)
-
-#     # sorting order
-#     baseSortList=np.arange(N_op)
-#     tRange=list(range(t0+1,t_total))+list(range(t0,-1,-1))
-#     # t0+1 case first
-#     t=t0+1
-#     sortList=np.argsort(-eVals[t])
-#     (eVals[t],w_eVecs[t])=(eVals[t][sortList],w_eVecs[t][:,sortList])
-#     for t in tRange[1:]:
-#         sortList=np.argsort(-eVals[t]) if t>t0 else np.argsort(eVals[t])
-#         (eVals[t],w_eVecs[t])=(eVals[t][sortList],w_eVecs[t][:,sortList])
-
-#     # for t in tRange[1:]:
-#     #     t_sort = t-1 if t>=t0+2 else t+1 if t<=t0-2 else t0+1
-#     #     inprod=np.abs(np.conj(w_eVecs[t]).T@w_eVecs[t_sort])
-#     #     sortList=np.argmax(inprod,axis=0)
-#     #     if len(np.unique(sortList))!=len(sortList):
-#     #         sortList=baseSortList[np.argmax(inprod,axis=1)]
-#     #     elif len(np.unique(sortList))!=len(sortList):
-#     #         inprod=np.abs(np.conj(w_eVecs[t]).T@w_eVecs[t0+1])
-#     #         sortList=np.argmax(inprod,axis=0)
-#     #     elif len(np.unique(sortList))!=len(sortList):
-#     #         sortList=baseSortList[np.argmax(inprod,axis=1)]
-#     #     elif len(np.unique(sortList))!=len(sortList):
-#     #         sortList=np.argsort(-eVals[t]) if t>t0 else np.argsort(eVals[t])
-#     #     (eVals[t],w_eVecs[t])=(eVals[t][sortList],w_eVecs[t][:,sortList])
-
-#     eVecs=[]
-#     for t in range(t_total):
-#         eVecs.append(np.conj(choLInv).T@w_eVecs[t])
-#     eVecs=np.array(eVecs)
-
-#     return(eVals,eVecs)
+    return (eVals,np.transpose(eVecs,[0,2,1]))
 
 # lattice
 
@@ -251,6 +219,7 @@ class LatticeEnsemble:
     hbarc = 1/197.3 # hbarc = fm * MeV
     def __init__(self, ensemble):
         if ensemble == 'cA2.09.48':
+            self.label='cA2.09.48'
             self.a=0.0938; self.L=4.50; self.ampi=0.06208; self.amN=0.4436
             self.info='cSW=1.57551, beta=2.1, Nf=2, V=48^3*96'
             self.amu=0.0009
@@ -258,6 +227,7 @@ class LatticeEnsemble:
         # elif ensemble == 'cA211.30.32':
         #     self.a=0.0947; self.L=3.03; self.ampi=0.12530; self.amN=0.5073
         elif ensemble == 'cA211.530.24':
+            self.label='cA211.530.24'
             self.a=0.0947; self.L=2.27; self.ampi=0.16626; self.amN=0.56
             self.amu=0.0053
             self.ZA=0.7501; self.ZP=0.4654; self.ZS=0.6715; self.ZV=0.7061; self.ZT=0.8030 # all for non-singlet
@@ -305,15 +275,18 @@ app_init=[['pi0i',{'pib'}],['pi0f',{'pia'}],['j',{'j'}],['P',{'pia','pib'}],\
     ['jPi',{'j','pib'}],['jPf',{'pia','j'}],['PJP',{'pia','j','pib'}]]
 diag_init=[
     [['N','N_bw'],{'N'},\
-        [[],['pi0i'],['pi0f'],['P'],['pi0f','pi0i'], ['j'],['jPi'],['j','pi0i'],['jPf'],['pi0f','j']]],
+        [[],['pi0i'],['pi0f'],['P'],['pi0f','pi0i'], ['j'],['jPi'],['j','pi0i'],['jPf'],['pi0f','j'],
+     ['P','j'],['pi0f','jPi'],['jPf','pi0i'],['pi0f','j','pi0i']]],
     [['T','T_bw'],{'N','pib'},\
-        [[],['pi0f'],['j']]],
+        [[],['pi0f'],['j'],['jPf'],['pi0f','j']]],
     [['B2pt','W2pt','Z2pt','B2pt_bw','W2pt_bw','Z2pt_bw'],{'N','pia','pib'},\
-        [[]]],
+        [[],['j']]],
     [['NJN'],{'N','j'},\
-        [[],['pi0i']]],
+        [[],['pi0i'],['pi0f'],['P'],['pi0f','pi0i']]],
     [['B3pt','W3pt','Z3pt'],{'N','j','pib'},\
-        [[]]],
+        [[],['pi0f']]],
+    # [['NpiJNpi'],{'N','pia','j','pib'},\
+    #     [[]]],
 ]
 
 diags_all=set(); diags_pi0Loopful=set(); diags_jLoopful=set()
@@ -434,16 +407,20 @@ def getopab(pt,l,ofa,ofb):
     return getop(pt,l,ofa),getop(pt,l,ofb)
 def getops(pt,l,ofs):
     return [getop(pt,l,of) for of in ofs]    
-def op2opl(op,l):
+def op_getl_sgn(op):
+    return {'l1':-1,'l2':1}[op.split(';')[-2]]
+def op_flipl(op):
     t=op.split(';')
-    t[-2]=l
-    return ';'.join([t])
+    t[-2]={'l1':'l2','l2':'l1'}[t[-2]]
+    return ';'.join(t)
+    
 def needsVEV(opa,opb,insert):
-    flag=True
     _,pta,irrepa,_,la,_=opa.split(';'); _,ptb,irrepb,_,lb,_=opb.split(';')
     if pta!=ptb or irrepa!=irrepb or la!=lb:
-        flag=False
-    return flag
+        return False
+    if insert.split('_')[0] not in ['id','g5']:
+        return False
+    return True
 
 path='aux/group_coeffs.pkl'
 with open(path,'rb') as f:
@@ -458,4 +435,9 @@ def getCoeMat(pt):
     return np.linalg.inv(t)
 
 gtCj={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':1,'g5':-1,'g5gx':-1,'g5gy':-1,'g5gz':-1,'g5gt':1,
-      'sgmxy':-1} # gt G^dag gt = (gtCj) G
+      'sgmxy':-1,'sgmyz':-1,'sgmzx':-1,'sgmtx':1,'sgmty':1,'sgmtz':1} # gt G^dag gt = (gtCj) G
+
+fourCPTstar={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':1,'g5':-1,'g5gx':1,'g5gy':1,'g5gz':1,'g5gt':-1,
+         'sgmxy':1,'sgmyz':1,'sgmzx':1,'sgmtx':-1,'sgmty':-1,'sgmtz':-1} # g4CPT G^* g4CPT = (fourCPTstar) G
+
+TPack={'cA211.530.24':16,'cA2.09.48':24}
