@@ -13,6 +13,22 @@ flag_fast=False
 deepKey=lambda dic,n: dic if n==0 else deepKey(dic[list(dic.keys())[0]],n-1)
 npRound=lambda dat,n:np.round(np.array(dat).astype(float),n)
 
+def propagateError(func,mean,cov):
+    '''
+    y=func(x)=func(mean)+A(x-mean); x~(mean,cov)
+    Linear propagation of uncertainty
+    Everything are real numbers
+    '''
+    y_mean=func(mean)
+    AT=[]
+    for j in range(len(mean)):
+        unit=np.sqrt(cov[j,j])/10
+        ej=np.zeros(len(mean)); ej[j]=unit
+        AT.append((func(mean+ej)-y_mean)/unit)
+    AT=np.array(AT)
+    A=AT.T
+    y_cov=A@cov@AT
+    return (y_mean,y_cov)
 
 prefactorDeep=lambda dat,prefactor:np.real(prefactor*dat) if type(dat)==np.ndarray else [prefactorDeep(ele,prefactor) for ele in dat]
 meanDeep=lambda dat:np.mean(dat,axis=0) if type(dat)==np.ndarray else [meanDeep(ele) for ele in dat]
@@ -90,51 +106,58 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,out
     return (mean,err,cov)
 
 flag_fit_cov2err=False
-def fit(dat,func,fitfunc,estimator=None,pars0=None,mask_cov=None,jk=True):
+LEASTSQ_SUCCESS = [1, 2, 3, 4]
+def fit(dat,func,fitfunc,estimator=lambda pars:pars,pars0=None,mask_cov=None,jk=True):
     '''
     dat: raw data
     func: dat -> y_exp
-    fitfunc: par -> y_model
-    return: (mean,err,cov,chi2R,chi2R_err,Ndof)
+    fitfunc: pars -> y_model
+    return: (est_mean,est_err,est_cov,chi2R,chi2R_err,Ndof,pars) or None if failed
     '''
     Npar=len(signature(fitfunc).parameters)
     pars0=pars0 if pars0 is not None else [1 for i in range(Npar)]
 
-    _,_,cov0=jackknife(dat,func,outputFlatten=True)
+    _,_,cov=jackknife(dat,func,outputFlatten=True)
     if flag_fit_cov2err:
-        cov0=np.diag(np.diag(cov0))
+        cov=np.diag(np.diag(cov))
     if mask_cov is not None:
-        cov0=cov0*mask_cov
-    cho_L_Inv = np.linalg.inv(cholesky(cov0, lower=True))
-    Ny=len(cov0)
+        cov=cov*mask_cov
+    cho_L_Inv = np.linalg.inv(cholesky(cov, lower=True))
+    Ny=len(cov)
     Ndof=Ny-Npar
     
-    def tFunc(dat):
-        y_exp=np.hstack(func(dat))
-        t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
-        pars,pars_cov=leastsq(t_fitfunc,pars0,full_output=True)[:2]
-        chi2=np.sum(t_fitfunc(pars)**2)
-        return (pars,pars_cov,chi2)
-    mean,cov,chi2=tFunc(dat)
-    if estimator is None and (flag_fast or not jk):
-        if cov is None:
-            cov=np.zeros((len(mean),len(mean)))+np.inf
-        res=(mean,np.sqrt(np.diag(cov)),cov,chi2/Ndof,None,Ndof)
+    # 1st fit to all data
+    y_exp=np.hstack(func(dat))
+    t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
+    t=leastsq(t_fitfunc,pars0,full_output=True)
+    if t[-1] not in LEASTSQ_SUCCESS:
+        return None
+    pars,pars_cov=t[:2]
+    chi2=np.sum(t_fitfunc(pars)**2)
+
+    if flag_fast or not jk:
+        est_mean,est_cov=propagateError(estimator,pars,pars_cov)
+        res=(est_mean,np.sqrt(np.diag(est_cov)),est_cov,chi2/Ndof,None,Ndof,pars)
         return res
-    pars0=mean
+    pars0=pars
 
     def tFunc(dat):
         y_exp=np.hstack(func(dat))
         t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
-        pars,_=leastsq(t_fitfunc,pars0)
+        pars,info=leastsq(t_fitfunc,pars0)
+        if info not in LEASTSQ_SUCCESS:
+            raise Exception(info) 
         chi2=np.sum(t_fitfunc(pars)**2)
-        return [pars if estimator is None else estimator(pars),[chi2]]    
-    mean,err,cov=jackknife(dat,tFunc)
+        return [estimator(pars),[chi2]]   
+    try: 
+        mean,err,cov=jackknife(dat,tFunc)
+    except:
+        return None
     
-    pars_mean,pars_err,pars_cov=mean[0],err[0],cov[0][0]
+    est_mean,est_err,est_cov=mean[0],err[0],cov[0][0]
     chi2_mean,chi2_err=mean[1][0],err[1][0]
     chi2R_mean,chi2R_err=chi2_mean/Ndof,chi2_err/Ndof
-    res=(pars_mean,pars_err,pars_cov,chi2R_mean,chi2R_err,Ndof)
+    res=(est_mean,est_err,est_cov,chi2R_mean,chi2R_err,Ndof,pars)
     
     return res
 
@@ -156,51 +179,55 @@ def renormalize_eVecs(eVecs):
     eVecs_inv=eVecs_inv/np.diagonal(eVecs_inv,axis1=-2,axis2=-1)[...,None,:]
     return np.linalg.inv(eVecs_inv)
 
-def GEVP(Ct,t0,tv=None):
+def GEVP(Ct,t0List,tList=None,tvList=None):
     '''
-    t0>=0: tRef=t0
-    t0<0: tRef=t-|t0|
-    eVecs: return (time,n,i) but (time,i,n) in the middle
+    Ct: indexing from t=0
+    t0List>=0: t0=t0List
+    t0List<0: t0=t-|t0List|
+    # Return #
+    eVecs (the one to combine source operators): return (time,n,i) but (time,i,n) in the middle
     tv: reference time for getting wave function (Not return wave function if tv is None) 
-    Note: the e-vector is the one to combine source states.
     '''
     Ct=Ct.astype(complex)
     (t_total,N_op,N_op)=Ct.shape
-    if type(t0)==int:
-        if t0>=0:
-            t0=[t0 for t in range(t_total)]
+    if tList is None:
+        tList=range(t_total)
+    tList=np.array(tList)
+    if type(t0List)==int:
+        if t0List>=0:
+            t0List=[t0List for t in tList]
         else:
-            t0=[t+t0 if t+t0>0 else 1 for t in range(t_total)]
-    elif type(t0)==str:
-        if t0=='t/2':
-            t0=[(t+1)//2 for t in range(t_total)]
-    t0=[t0 if t!=t0 else 0 if t!=0 else 1 for t,t0 in enumerate(t0)] # we would never use t==t0 case, this is meant to avoid some warning msg
-    t0=np.array(t0)
-    Ct0=Ct[t0]
+            t0List=[t+t0List if t+t0List>0 else 1 for t in tList]
+    elif type(t0List)==str:
+        if t0List=='t/2':
+            t0List=[(t+1)//2 for t in tList]
+    t0List=[t0 if t!=t0 else 0 if t!=0 else 1 for t,t0 in zip(tList,t0List)] # we would never use t==t0 case, this is meant to avoid some warning msg
+    t0List=np.array(t0List)
+    Ct0=Ct[t0List]
     choL=np.linalg.cholesky(Ct0) # Ct0=choL@choL.H
     choLInv=np.linalg.inv(choL)
     choLInvDag=np.conj(np.transpose(choLInv,[0,2,1]))
-    w_Ct=choLInv@Ct@choLInvDag
+    w_Ct=choLInv@Ct[tList]@choLInvDag
     (eVals,w_eVecs)=np.linalg.eig(w_Ct)
     eVals=np.real(eVals)
     
-    for t in range(t_total):
-        t_t0=t0[t]
-        sortList=np.argsort(-eVals[t]) if t_t0<t else np.argsort(eVals[t]) 
-        (eVals[t],w_eVecs[t])=(eVals[t][sortList],w_eVecs[t][:,sortList])
+    for ind,t in enumerate(tList):
+        t0=t0List[ind]
+        sortList=np.argsort(-eVals[ind]) if t0<t else np.argsort(eVals[ind]) 
+        (eVals[ind],w_eVecs[ind])=(eVals[ind][sortList],w_eVecs[ind][:,sortList])
 
     eVecs=choLInvDag@w_eVecs
     
-    if tv is not None:
-        if type(tv)==str:
-            if tv=='t0':
-                tv=t0
-            elif tv=='t':
-                tv=range(t_total)
-        tv=np.array(tv)
-        tmp=np.conj(np.transpose(eVecs,[0,2,1]))@Ct[tv]@eVecs
+    if tvList is not None:
+        if type(tvList)==str:
+            if tvList=='t0':
+                tvList=t0List
+            elif tvList=='t':
+                tvList=tList
+        tvList=np.array(tvList)
+        tmp=np.conj(np.transpose(eVecs,[0,2,1]))@Ct[tvList]@eVecs
         tmp=np.real(tmp[:,range(N_op),range(N_op)])
-        powers=np.array([ t_tv/(t-t_t0) if t!=t_t0 else 0 for t,t_t0,t_tv in zip(range(t_total),t0,tv)])
+        powers=np.array([ tv/(t-t0) if t!=t0 else 0 for t,t0,tv in zip(tList,t0List,tvList)])
         fn=np.sqrt( tmp / (eVals**powers[:,None]))
         eVecs_normalized=eVecs/fn[:,None,:]
         eVecs_normalized=np.transpose(eVecs_normalized,[0,2,1]) # v^n_i
@@ -223,14 +250,23 @@ class LatticeEnsemble:
             self.a=0.0938; self.L=4.50; self.ampi=0.06208; self.amN=0.4436
             self.info='cSW=1.57551, beta=2.1, Nf=2, V=48^3*96'
             self.amu=0.0009
-            self.ZA=0.791; self.ZP=0.500; self.ZS=0.661
+            # below all for non-singlet
+            self.ZA=0.791; self.ZA_err=0.001
+            self.ZP=0.500; self.ZP_err=0.030
+            self.ZS=0.661; self.ZS_err=0.002
         # elif ensemble == 'cA211.30.32':
         #     self.a=0.0947; self.L=3.03; self.ampi=0.12530; self.amN=0.5073
         elif ensemble == 'cA211.530.24':
             self.label='cA211.530.24'
             self.a=0.0947; self.L=2.27; self.ampi=0.16626; self.amN=0.56
             self.amu=0.0053
-            self.ZA=0.7501; self.ZP=0.4654; self.ZS=0.6715; self.ZV=0.7061; self.ZT=0.8030 # all for non-singlet
+            # below all for non-singlet
+            self.ZA=0.7525; self.ZA_err=0.0006
+            # self.ZA=0.7280; self.ZA_err=0.0017
+            self.ZP=0.4626; self.ZP_err=0.0071
+            self.ZS=0.6154; self.ZS_err=0.0097
+            self.ZV=0.7109; self.ZV_err=0.0010
+            self.ZT=0.8128; self.ZT_err=0.0073
         else:
             print(ensemble+' not implemented')
         self.aInv=1/(self.a*self.hbarc); self.tpiL=(2*math.pi)/(self.L*self.hbarc); 
