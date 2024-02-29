@@ -1,4 +1,4 @@
-import h5py  
+import os,h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -7,7 +7,35 @@ import pickle
 from scipy.optimize import leastsq, curve_fit
 from scipy.linalg import solve_triangular,cholesky
 from inspect import signature
-
+ 
+slName='temp'
+os.makedirs('aux/sl',exist_ok=True)
+if os.path.exists('aux/sl/temp'):
+    os.remove('aux/sl/temp')
+sldata={}
+def sl(key,val="sl_load",flagSave=False):
+    if key is None:
+        return val
+    global sldata
+    file='aux/sl/'+slName
+    file_backup=file+'_backup'
+    if os.path.isfile(file_backup):
+        os.replace(file_backup,file)
+    if not os.path.isfile(file):
+        with open(file,'wb') as f:
+            pickle.dump(sldata,f)
+    with open(file,'rb') as f:
+        sldata=pickle.load(f)
+    if not flagSave and key in sldata:
+        return sldata[key]
+    if val is not "sl_load":
+        sldata[key]=val
+        os.replace(file,file_backup)
+        with open(file,'wb') as f:
+            pickle.dump(sldata,f)
+        os.remove(file_backup)
+    return val
+         
 flag_fast=False
 
 deepKey=lambda dic,n: dic if n==0 else deepKey(dic[list(dic.keys())[0]],n-1)
@@ -22,7 +50,7 @@ def propagateError(func,mean,cov):
     y_mean=func(mean)
     AT=[]
     for j in range(len(mean)):
-        unit=np.sqrt(cov[j,j])/10
+        unit=np.sqrt(cov[j,j])/1000
         ej=np.zeros(len(mean)); ej[j]=unit
         AT.append((func(mean+ej)-y_mean)/unit)
     AT=np.array(AT)
@@ -32,7 +60,7 @@ def propagateError(func,mean,cov):
 
 prefactorDeep=lambda dat,prefactor:np.real(prefactor*dat) if type(dat)==np.ndarray else [prefactorDeep(ele,prefactor) for ele in dat]
 meanDeep=lambda dat:np.mean(dat,axis=0) if type(dat)==np.ndarray else [meanDeep(ele) for ele in dat]
-def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,outputFlatten=False):
+def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:int=600,d:int=0,outputFlatten=False,sl_key=None,sl_saveQ=False):
     '''
     - in_dat: any-dimensional list of ndarrays. Each ndarray in the list has 0-axis for cfgs
     - in_func: dat -> estimator
@@ -41,11 +69,18 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,out
     ### return: mean,err,cov
     - mean,err: estimator's format reformatted to 1d-list of 1d-arrays
     - cov: 2d-list of 2d-arrays
-    '''
+    '''  
+    if sl_key is not None and not sl_saveQ:
+        ret=sl(sl_key)
+        if ret is not "sl_load":
+            return ret
+        
+    getNcfg=lambda dat: len(dat) if type(dat)==np.ndarray else getNcfg(dat[0])
+    n=getNcfg(in_dat)
     if flag_fast:
-        getNcfg=lambda dat: len(dat) if type(dat)==np.ndarray else getNcfg(dat[0])
-        n=getNcfg(in_dat)
         d=n//300
+    elif d==0:
+        d=n//minNcfg
     
     # average ${d} cfgs
     if d!=1:
@@ -74,9 +109,6 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,out
     else:
         1/0
         
-    # getNcfg
-    getNcfg=lambda dat: len(dat) if type(dat)==np.ndarray else getNcfg(dat[0])
-        
     # delete i 
     delete= lambda dat,i: np.delete(dat,i,axis=0) if type(dat)==np.ndarray else [delete(ele,i) for ele in dat]
     
@@ -89,7 +121,8 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,out
     tErr=np.sqrt(np.diag(tCov))
     
     if outputFlatten:
-        return (tMean,tErr,tCov)
+        ret=(tMean,tErr,tCov)
+        return sl(sl_key,ret,True)
     
     # reformat
     mean=[];err=[];t=0
@@ -103,17 +136,24 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,out
         for j in lenList:
             covI.append(tCov[t:t+i,tI:tI+j]);tI+=j
         cov.append(covI);t+=i
-    return (mean,err,cov)
+        
+    ret=(mean,err,cov)
+    return sl(sl_key,ret,True)
 
 flag_fit_cov2err=False
 LEASTSQ_SUCCESS = [1, 2, 3, 4]
-def fit(dat,func,fitfunc,estimator=lambda pars:pars,pars0=None,mask_cov=None,jk=True):
+def fit(dat,func,fitfunc,estimator=lambda pars:pars,pars0=None,mask_cov=None,jk=True,sl_key=None,sl_saveQ=False):
     '''
     dat: raw data
     func: dat -> y_exp
     fitfunc: pars -> y_model
     return: (est_mean,est_err,est_cov,chi2R,chi2R_err,Ndof,pars) or None if failed
     '''
+    if sl_key is not None and not sl_saveQ:
+        ret=sl(sl_key)
+        if ret is not "sl_load":
+            return ret
+        
     Npar=len(signature(fitfunc).parameters)
     pars0=pars0 if pars0 is not None else [1 for i in range(Npar)]
 
@@ -130,36 +170,37 @@ def fit(dat,func,fitfunc,estimator=lambda pars:pars,pars0=None,mask_cov=None,jk=
     y_exp=np.hstack(func(dat))
     t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
     t=leastsq(t_fitfunc,pars0,full_output=True)
-    if t[-1] not in LEASTSQ_SUCCESS:
-        return None
+    if t[-1] not in LEASTSQ_SUCCESS or t[1] is None:
+        ret=None
+        return sl(sl_key,ret,True)
     pars,pars_cov=t[:2]
     chi2=np.sum(t_fitfunc(pars)**2)
 
     if flag_fast or not jk:
         est_mean,est_cov=propagateError(estimator,pars,pars_cov)
-        res=(est_mean,np.sqrt(np.diag(est_cov)),est_cov,chi2/Ndof,None,Ndof,pars)
-        return res
+        ret=(est_mean,np.sqrt(np.diag(est_cov)),est_cov,chi2/Ndof,None,Ndof,pars)
+        return sl(sl_key,ret,True)
     pars0=pars
 
     def tFunc(dat):
         y_exp=np.hstack(func(dat))
         t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
         pars,info=leastsq(t_fitfunc,pars0)
-        if info not in LEASTSQ_SUCCESS:
+        if info not in LEASTSQ_SUCCESS or t[1] is None:
             raise Exception(info) 
         chi2=np.sum(t_fitfunc(pars)**2)
         return [estimator(pars),[chi2]]   
     try: 
         mean,err,cov=jackknife(dat,tFunc)
     except:
-        return None
+        ret=None
+        return sl(sl_key,ret,True)
     
     est_mean,est_err,est_cov=mean[0],err[0],cov[0][0]
     chi2_mean,chi2_err=mean[1][0],err[1][0]
     chi2R_mean,chi2R_err=chi2_mean/Ndof,chi2_err/Ndof
-    res=(est_mean,est_err,est_cov,chi2R_mean,chi2R_err,Ndof,pars)
-    
-    return res
+    ret=(est_mean,est_err,est_cov,chi2R_mean,chi2R_err,Ndof,pars)
+    return sl(sl_key,ret,True)
 
 def modelAvg(fits):
     '''
@@ -250,23 +291,50 @@ class LatticeEnsemble:
             self.a=0.0938; self.L=4.50; self.ampi=0.06208; self.amN=0.4436
             self.info='cSW=1.57551, beta=2.1, Nf=2, V=48^3*96'
             self.amu=0.0009
-            # below all for non-singlet
-            self.ZA=0.791; self.ZA_err=0.001
-            self.ZP=0.500; self.ZP_err=0.030
-            self.ZS=0.661; self.ZS_err=0.002
+            # Alexandrou:2019brg
+            # self.ZA_ns=(0.7910,0.0006)
+            # self.ZA_s=(0.797,0.009)
+            # self.ZP_ns=(0.50,0.03)
+            # self.ZP_s=(0.50,0.02)
+            # self.ZT_ns=(0.855,0.002)
+            # self.ZT_s=(0.852,0.005)
+            # Alexandrou:2020okk
+            self.ZA=(0.791,0.001)
+            self.ZP=(0.500,0.030)
+            self.ZS=(0.661,0.002)
+            self.ZSbyZP=(1.3220,0.0794)
+            
+            # # bare
+            # self.ZP=(self.ZS[0]/self.ZA[0],0.0001)
+            # self.ZSbyZP=self.ZA
+            
         # elif ensemble == 'cA211.30.32':
         #     self.a=0.0947; self.L=3.03; self.ampi=0.12530; self.amN=0.5073
         elif ensemble == 'cA211.530.24':
-            self.label='cA211.530.24'
-            self.a=0.0947; self.L=2.27; self.ampi=0.16626; self.amN=0.56
+            self.label='cA211.530.24' # Alexandrou:2022amy
+            self.a=0.09076; self.L=2.27; self.ampi=0.16626; self.amN=0.56
             self.amu=0.0053
-            # below all for non-singlet
-            self.ZA=0.7525; self.ZA_err=0.0006
-            # self.ZA=0.7280; self.ZA_err=0.0017
-            self.ZP=0.4626; self.ZP_err=0.0071
-            self.ZS=0.6154; self.ZS_err=0.0097
-            self.ZV=0.7109; self.ZV_err=0.0010
-            self.ZT=0.8128; self.ZT_err=0.0073
+            # Gregoris RI-MOM
+            # self.ZS_ns=(0.6670,0.0059)
+            self.ZP_ns=(0.4670,0.0046)
+            # self.ZV_ns=(0.7112,0.0005)
+            # self.ZA_ns=(0.7523,0.0004)
+            # self.ZT_ns=(0.8142,0.0022)
+            # self.ZAbyZV_ns=(1.0579,0.0006)
+            # self.ZSbyZP_ns=(1.4281,0.0167)
+            # Gregoris Hadronic method
+            self.ZPbyZS=(0.75151,0.00288)
+            self.ZA=(0.72799,0.00167)
+            self.ZAbyZV=(1.05970,0.00240)
+            self.ZV=(0.687004,0.000139)
+            self.ZSbyZP=(1.330654,0.0050994)
+            self.ZP=self.ZP_ns 
+            self.ZS=(0.6081090071988398,0.006549636723529223)
+            
+            # # bare
+            # self.ZP=(self.ZS[0]/self.ZA[0],0.0001)
+            # self.ZSbyZP=self.ZA
+            
         else:
             print(ensemble+' not implemented')
         self.aInv=1/(self.a*self.hbarc); self.tpiL=(2*math.pi)/(self.L*self.hbarc); 
@@ -290,19 +358,17 @@ def getFigAxs(Nrow,Ncol,Lrow=None,Lcol=None,scale=1,**kwargs):
     fig, axs = plt.subplots(Nrow, Ncol, figsize=(Lcol*Ncol, Lrow*Nrow), squeeze=False,**kwargs)
     return fig, axs
     
-def addRowHeader(axs,rows):
+def addRowHeader(axs,rows,fontsize='xx-large',**kargs):
     pad=5
     for ax, row in zip(axs[:,0], rows):
         ax.annotate(row, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0),
-                xycoords=ax.yaxis.label, textcoords='offset points',
-                size='large', ha='right', va='center')
+                xycoords=ax.yaxis.label, textcoords='offset points', ha='right', va='center', fontsize=fontsize, **kargs)
         
-def addColHeader(axs,cols):
+def addColHeader(axs,cols,fontsize='xx-large',**kargs):
     pad=5
     for ax, col in zip(axs[0,:], cols):
         ax.annotate(col, xy=(0.5, 1), xytext=(0, pad),
-                xycoords='axes fraction', textcoords='offset points',
-                size='large', ha='center', va='baseline')
+                xycoords='axes fraction', textcoords='offset points', ha='center', va='baseline', fontsize=fontsize, **kargs)
 
         
 #######################################################################################
