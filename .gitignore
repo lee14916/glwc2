@@ -3,6 +3,7 @@
 **/log
 **/*nohup.out
 **/*_ignore.*
+**/aux/sl/*
 
 
 **/__pycache__
