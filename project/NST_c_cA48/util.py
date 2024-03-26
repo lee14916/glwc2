@@ -35,6 +35,12 @@ def sl(key,val="sl_load",flagSave=False):
             pickle.dump(sldata,f)
         os.remove(file_backup)
     return val
+
+def sl_reset():
+    global sldata
+    sldata={}
+    if os.path.exists('aux/sl/temp'):
+        os.remove('aux/sl/temp')
          
 flag_fast=False
 
@@ -52,12 +58,18 @@ def propagateError(func,mean,cov):
     for j in range(len(mean)):
         unit=np.sqrt(cov[j,j])/1000
         ej=np.zeros(len(mean)); ej[j]=unit
-        AT.append((func(mean+ej)-y_mean)/unit)
+        AT.append((np.array(func(mean+ej))-y_mean)/unit)
     AT=np.array(AT)
     A=AT.T
     y_cov=A@cov@AT
-    return (y_mean,y_cov)
+    return (np.array(y_mean),y_cov)
 
+def extendMeanCov(mean,cov,exts):
+    ext_mean=[ext[0] for ext in exts]; ext_err=[ext[1] for ext in exts]
+    tmean=np.hstack([mean,ext_mean])
+    tcov=np.block([[cov,np.zeros((len(cov),len(ext_mean)))],[np.zeros((len(ext_mean),len(cov))),np.diag(ext_err)**2]])
+    return tmean,tcov
+    
 prefactorDeep=lambda dat,prefactor:np.real(prefactor*dat) if type(dat)==np.ndarray else [prefactorDeep(ele,prefactor) for ele in dat]
 meanDeep=lambda dat:np.mean(dat,axis=0) if type(dat)==np.ndarray else [meanDeep(ele) for ele in dat]
 def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:int=600,d:int=0,outputFlatten=False,sl_key=None,sl_saveQ=False):
@@ -81,6 +93,7 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:int
         d=n//300
     elif d==0:
         d=n//minNcfg
+    d=max(d,1)
     
     # average ${d} cfgs
     if d!=1:
@@ -140,6 +153,14 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:int
     ret=(mean,err,cov)
     return sl(sl_key,ret,True)
 
+def fit0(fitfunc,mean,cov,pars0=None,full_output=False):
+    Npar=len(signature(fitfunc).parameters)
+    pars0=pars0 if pars0 is not None else [1 for i in range(Npar)]
+    cho_L_Inv = np.linalg.inv(cholesky(cov, lower=True))
+    y_exp=np.hstack(mean)
+    t_fitfunc=lambda pars: cho_L_Inv@(np.hstack(fitfunc(*pars))-y_exp)
+    return leastsq(t_fitfunc,pars0,full_output=full_output)
+
 flag_fit_cov2err=False
 LEASTSQ_SUCCESS = [1, 2, 3, 4]
 def fit(dat,func,fitfunc,estimator=lambda pars:pars,pars0=None,mask_cov=None,jk=True,sl_key=None,sl_saveQ=False):
@@ -189,7 +210,7 @@ def fit(dat,func,fitfunc,estimator=lambda pars:pars,pars0=None,mask_cov=None,jk=
         if info not in LEASTSQ_SUCCESS or t[1] is None:
             raise Exception(info) 
         chi2=np.sum(t_fitfunc(pars)**2)
-        return [estimator(pars),[chi2]]   
+        return [np.array(estimator(pars)),[chi2]]   
     try: 
         mean,err,cov=jackknife(dat,tFunc)
     except:
@@ -288,9 +309,12 @@ class LatticeEnsemble:
     def __init__(self, ensemble):
         if ensemble == 'cA2.09.48':
             self.label='cA2.09.48'
-            self.a=0.0938; self.L=4.50; self.ampi=0.06208; self.amN=0.4436
+            self.a=0.0938; self.L=4.50; self.ampi=0.061947; self.amN=0.442921
             self.info='cSW=1.57551, beta=2.1, Nf=2, V=48^3*96'
             self.amu=0.0009
+            # Alexandrou:2015sea
+            self.ZV=(0.7565,0.0004)
+            self.ZPbyZS=(0.7016,0.0141); self.ZSbyZP=(1.4253135689851768,0.028644414656058995)
             # Alexandrou:2019brg
             # self.ZA_ns=(0.7910,0.0006)
             # self.ZA_s=(0.797,0.009)
@@ -301,9 +325,7 @@ class LatticeEnsemble:
             # Alexandrou:2020okk
             self.ZA=(0.791,0.001)
             self.ZP=(0.500,0.030)
-            self.ZS=(0.661,0.002)
-            self.ZSbyZP=(1.3220,0.0794)
-            
+            self.ZS=(0.661,0.002); self.ZSbyZP=(1.3220,0.0794)
             # # bare
             # self.ZP=(self.ZS[0]/self.ZA[0],0.0001)
             # self.ZSbyZP=self.ZA
@@ -321,7 +343,7 @@ class LatticeEnsemble:
             # self.ZA_ns=(0.7523,0.0004)
             # self.ZT_ns=(0.8142,0.0022)
             # self.ZAbyZV_ns=(1.0579,0.0006)
-            # self.ZSbyZP_ns=(1.4281,0.0167)
+            # self.ZSbyZP_ns=(1.4281,0.0167); 
             # Gregoris Hadronic method
             self.ZPbyZS=(0.75151,0.00288)
             self.ZA=(0.72799,0.00167)
