@@ -378,6 +378,7 @@ def getFigAxs(Nrow,Ncol,Lrow=None,Lcol=None,scale=1,**kwargs):
         # if (Nrow,Ncol)==(1,1):
         #     Lcol*=1.5; Lrow*=1.5
     fig, axs = plt.subplots(Nrow, Ncol, figsize=(Lcol*Ncol, Lrow*Nrow), squeeze=False,**kwargs)
+    fig.align_ylabels()
     return fig, axs
     
 def addRowHeader(axs,rows,fontsize='xx-large',**kargs):
