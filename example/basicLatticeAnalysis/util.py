@@ -24,19 +24,17 @@ def propagateError(func,mean,cov):
 def jackknife(dat_ens,d=1):
     n=len(dat_ens)
     return np.array([np.mean(np.delete(dat_ens,i,axis=0),axis=0) for i in range(n)])
-def jackmean(dat_jk):
-    return np.mean(dat_jk,axis=0)
-def jackerr(dat_jk):
-    n=len(dat_jk)
-    return np.sqrt(np.var(dat_jk,axis=0)*(n-1))
-def jackcov(dat_jk):
-    n=len(dat_jk)
-    return np.atleast_2d(np.cov(dat_jk.T)*(n-1)*(n-1)/n)
 def jackME(dat_jk):
-    return (jackmean(dat_jk),jackerr(dat_jk))
+    n=len(dat_jk)
+    dat_mean=np.mean(dat_jk,axis=0)
+    dat_err=np.sqrt(np.var(dat_jk,axis=0)*(n-1))
+    return (dat_mean,dat_err)
 def jackMEC(dat_jk):
-    dat_cov=jackcov(dat_jk)
-    return (jackmean(dat_jk),np.sqrt(np.diag(dat_cov)),dat_cov)
+    n=len(dat_jk)
+    dat_mean=np.mean(dat_jk,axis=0)
+    dat_cov=np.atleast_2d(np.cov(np.array(dat_jk).T)*(n-1)*(n-1)/n)
+    dat_err=np.sqrt(np.diag(dat_cov))
+    return (dat_mean,dat_err,dat_cov)
 def jackknife_pseudo(mean,cov,n):
     dat_ens=np.random.multivariate_normal(mean,cov*n,n)
     dat_jk=jackknife(dat_ens)
@@ -55,10 +53,9 @@ def jackfit(fitfunc,y_jk,pars0,estimator=lambda x:[],correlatedQ=True):
     cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True))
     fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
     pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True)[:2]
-    
+
+    chi2=np.sum(fitfunc_wrapper(pars_mean)**2)
     Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
-    y_fit=fitfunc(pars_mean)
-    chi2=(y_fit-y_mean)@np.linalg.inv(y_cov)@(y_fit-y_mean)
     chi2R=chi2/Ndof
     
     pars2obs=lambda pars:np.hstack([estimator(pars),pars])
