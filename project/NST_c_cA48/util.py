@@ -309,7 +309,7 @@ class LatticeEnsemble:
     def __init__(self, ensemble):
         if ensemble == 'cA2.09.48':
             self.label='cA2.09.48'
-            self.a=0.0938; self.L=4.50; self.ampi=0.061947; self.amN=0.442921
+            self.a=0.0938; self.L=4.50; self.ampi=0.061947; self.amN=0.44283639
             self.info='cSW=1.57551, beta=2.1, Nf=2, V=48^3*96'
             self.amu=0.0009
             # Alexandrou:2015sea
@@ -334,7 +334,7 @@ class LatticeEnsemble:
         #     self.a=0.0947; self.L=3.03; self.ampi=0.12530; self.amN=0.5073
         elif ensemble == 'cA211.530.24':
             self.label='cA211.530.24' # Alexandrou:2022amy
-            self.a=0.09076; self.L=2.27; self.ampi=0.16626; self.amN=0.56
+            self.a=0.09076; self.L=2.27; self.ampi=0.16626; self.amN=0.54902
             self.amu=0.0053
             # Gregoris RI-MOM
             # self.ZS_ns=(0.6670,0.0059)
