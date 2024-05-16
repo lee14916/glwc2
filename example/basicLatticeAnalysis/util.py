@@ -3,73 +3,47 @@ from math import floor, log10
 from scipy.optimize import leastsq
 from scipy.linalg import cholesky
 
-flag_fast=False
-
-def propagateError(func,mean,cov):
-    '''
-    y=func(x)=func(mean)+A(x-mean); x~(mean,cov)
-    Linear propagation of uncertainty
-    '''
-    y_mean=func(mean)
-    AT=[]
-    for j in range(len(mean)):
-        unit=np.sqrt(cov[j,j])/1000
-        ej=np.zeros(len(mean)); ej[j]=unit
-        AT.append((np.array(func(mean+ej))-y_mean)/unit)
-    AT=np.array(AT)
-    A=AT.T
-    y_cov=A@cov@AT
-    return (np.array(y_mean),y_cov)
-
-def jackknife(dat_ens,d=1):
-    n=len(dat_ens)
-    return np.array([np.mean(np.delete(dat_ens,i,axis=0),axis=0) for i in range(n)])
-def jackME(dat_jk):
+def jackknife(dat):
+    n=len(dat)
+    return np.array([np.mean(np.delete(dat,i,axis=0),axis=0) for i in range(n)])
+def jackme(dat_jk):
     n=len(dat_jk)
     dat_mean=np.mean(dat_jk,axis=0)
     dat_err=np.sqrt(np.var(dat_jk,axis=0)*(n-1))
     return (dat_mean,dat_err)
-def jackMEC(dat_jk):
+def jackmec(dat_jk):
     n=len(dat_jk)
     dat_mean=np.mean(dat_jk,axis=0)
     dat_cov=np.atleast_2d(np.cov(np.array(dat_jk).T)*(n-1)*(n-1)/n)
     dat_err=np.sqrt(np.diag(dat_cov))
     return (dat_mean,dat_err,dat_cov)
-def jackknife_pseudo(mean,cov,n):
-    dat_ens=np.random.multivariate_normal(mean,cov*n,n)
-    dat_jk=jackknife(dat_ens)
-    # do transformation [obs_jk -> A obs_jk + B] to force pseudo mean and err exactly the same
-    mean1,_,cov1=jackMEC(dat_jk)
-    A=np.sqrt(np.diag(cov)/np.diag(cov1))
-    B=mean-A*mean1
-    dat_jk=A[None,:]*dat_jk+B[None,:]
-    return dat_jk
+def jackmap(func,dat_jk):
+    return np.array([func(dat) for dat in dat_jk])
     
-def jackfit(fitfunc,y_jk,pars0,estimator=lambda x:[],correlatedQ=True):
-    y_mean,_,y_cov=jackMEC(y_jk)
-    if not correlatedQ:
-        y_cov=np.diag(np.diag(y_cov))
+def jackfit(fitfunc,y_jk,pars0,estimator=lambda x:[],mask=None):
+    y_mean,_,y_cov=jackmec(y_jk)
+    if mask is not None:
+        if mask is 'uncorrelated':
+            y_cov=np.diag(np.diag(y_cov))
+        else:
+            y_cov=y_cov*mask
         
-    cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True))
+    cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True)) # y_cov^{-1}=cho_L_Inv^T@cho_L_Inv
     fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
     pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True)[:2]
-
-    chi2=np.sum(fitfunc_wrapper(pars_mean)**2)
-    Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
-    chi2R=chi2/Ndof
     
     pars2obs=lambda pars:np.hstack([estimator(pars),pars])
-    if flag_fast: # Generate pseudo jackknife resamples from the single fit 
-        obs_mean,obs_cov=propagateError(pars2obs,pars_mean,pars_cov)
-        n=len(y_jk)
-        obs_jk=jackknife_pseudo(obs_mean,obs_cov,n)
-    else:
-        def func(dat):
-            fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
-            pars=leastsq(fitfunc_wrapper2,pars_mean)[0]
-            obs=pars2obs(pars)
-            return obs
-        obs_jk=np.array([func(dat) for dat in y_jk])
+    def func(dat):
+        fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
+        pars=leastsq(fitfunc_wrapper2,pars_mean)[0]
+        obs=pars2obs(pars)
+        return obs
+    obs_jk=jackmap(func,y_jk)
+        
+    pars_jk_mean=obs_jk[:,-len(pars0):].mean(axis=0)
+    chi2=np.sum(fitfunc_wrapper(pars_jk_mean)**2)
+    Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
+    chi2R=chi2/Ndof
 
     return obs_jk,chi2R,Ndof
 
