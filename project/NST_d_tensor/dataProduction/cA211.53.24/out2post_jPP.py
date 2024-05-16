@@ -11,7 +11,7 @@ def cfg2out(cfg):
     return path
 
 flags={
-    'convert_gms':True, # adjust structure of gms
+    'convert_gms_Yan':True, # adjust structure of gms
     'removeAdditionalDimension_P':True,
 }
 
@@ -70,11 +70,11 @@ def run(cfg):
                             t=t[pi2Map,:,jMap]
                             t=np.transpose(t,[1,0,2])
                             t=t[:,:,:len(aux.gjList)]
-                            if flags['convert_gms']:
-                                t_gmMap=np.array([0,1,2,3,4, 5,6,7,8,9, 12,11,10,13,14, 15])
+                            if flags['convert_gms_Yan']:
+                                t_gmMap=np.array([0,1,2,3,4, 5,6,7,8,9, 11,12,10,13,14, 15])
                                 t=t[...,t_gmMap]
                                 t_gmMul=np.array([1,1,1,1,1, 1,1,1,1,1, 1j,-1j,1j,1j,1j, 1j])
-                                t=t*t_gmMul[None,None,:]    
+                                t=t*t_gmMul[None,None,:]   
                             fw.create_dataset('data/'+src_new+'/'+j+'_pi0',data=t.astype('complex64'))
         os.remove(outfile_flag)
         

@@ -6,8 +6,6 @@ import os, click, h5py, re, pickle
 import numpy as np
 import aux
 
-1/0 # do it in /project/s1174/lyan/code/projectData/NST_d/cA211.530.24_NJNpi_post
-
 postcode='NJNpi-b-Nsrc3*1-tensor'
 def cfg2out(cfg):
     path = '/project/s1174/fpittler/code/projectData/nucleon_sigma_term/cA211'+cfg[0]+'.53.24/NJNpi_GEVP/outputdata_sinkMom_SIGMA/'+cfg[1:]+'/'
