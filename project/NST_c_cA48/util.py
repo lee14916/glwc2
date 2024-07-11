@@ -401,7 +401,7 @@ app_init=[['pi0i',{'pib'}],['pi0f',{'pia'}],['j',{'j'}],['P',{'pia','pib'}],\
 diag_init=[
     [['N','N_bw'],{'N'},\
         [[],['pi0i'],['pi0f'],['P'],['pi0f','pi0i'], ['j'],['jPi'],['j','pi0i'],['jPf'],['pi0f','j'],
-     ['P','j'],['pi0f','jPi'],['jPf','pi0i'],['pi0f','j','pi0i']]],
+     ['P','j'],['pi0f','jPi'],['jPf','pi0i'],['pi0f','j','pi0i'],['PJP']]],
     [['T','T_bw'],{'N','pib'},\
         [[],['pi0f'],['j'],['jPf'],['pi0f','j']]],
     [['B2pt','W2pt','Z2pt','B2pt_bw','W2pt_bw','Z2pt_bw'],{'N','pia','pib'},\
