@@ -128,6 +128,8 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:int
     # jackknife     
     n=getNcfg(dat)
     Tn1=np.array([func(delete(dat,i)) for i in range(n)])
+    # print(np.mean(func()))
+    # print(np.sqrt(np.var(Tn1)*n))
     TnBar=np.mean(Tn1,axis=0)
     (tMean,tCov)=(TnBar, np.atleast_2d(np.cov(Tn1.T)*(n-1)*(n-1)/n))
     # Tn=func(dat); (mean,cov)=(n*Tn-(n-1)*TnBar, np.atleast_2d(np.cov(Tn1.T)*(n-1)*(n-1)/n)) # bias improvement (not suitable for fit)
@@ -375,7 +377,7 @@ class LatticeEnsemble:
 def getFigAxs(Nrow,Ncol,Lrow=None,Lcol=None,scale=1,**kwargs):
     if (Lrow,Lcol)==(None,None):
         Lcol,Lrow=mpl.rcParams['figure.figsize']
-        Lrow*=scale; Lrow*=scale
+        Lrow*=scale; Lcol*=scale
         # if (Nrow,Ncol)==(1,1):
         #     Lcol*=1.5; Lrow*=1.5
     fig, axs = plt.subplots(Nrow, Ncol, figsize=(Lcol*Ncol, Lrow*Nrow), squeeze=False,**kwargs)
