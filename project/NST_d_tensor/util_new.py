@@ -40,8 +40,8 @@ def jackknife(dat,d:int=0,nmin:int=6000):
         def tfunc(dat):
             shape=dat.shape
             nLeft=(shape[0]//d)*d
-            shape_new=(d,shape[0]//d)+shape[1:]
-            return dat[:nLeft].reshape(shape_new).mean(axis=0)
+            shape_new=(shape[0]//d,d)+shape[1:]
+            return dat[:nLeft].reshape(shape_new).mean(axis=1)
         dat_run=tfunc(dat)
     else:
         dat_run=dat

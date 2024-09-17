@@ -38,8 +38,8 @@ def jackknife(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),d:int=1,out
                 return [tfunc(ele) for ele in dat]
             shape=dat.shape
             nLeft=(shape[0]//d)*d
-            shape_new=(d,shape[0]//d)+shape[1:]
-            return dat[:nLeft].reshape(shape_new).mean(axis=0)
+            shape_new=(shape[0]//d,d)+shape[1:]
+            return dat[:nLeft].reshape(shape_new).mean(axis=1)
         dat=tfunc(in_dat)
     else:
         dat=in_dat
