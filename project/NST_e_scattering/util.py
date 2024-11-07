@@ -31,7 +31,7 @@ def propagateError(func,mean,cov):
     return (np.array(y_mean),y_cov)
 
 # def jackknife(dat,d:int=0,nmin:int=6000):
-def jackknife(dat,d:int=16,nmin:int=6000):
+def jackknife(dat,d:int=20,nmin:int=6000):
     n=len(dat)
     if flag_fast:
         d=n//300
