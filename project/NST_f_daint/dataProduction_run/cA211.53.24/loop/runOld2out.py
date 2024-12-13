@@ -48,6 +48,7 @@ def run(cfg):
                 
                 t=f[st][sid]['up'][:]
                 t=t[...,0]+1j*t[...,1]
+                t=np.complex128(t)
                 t=t[:,moms_map]
                 t=t[...,t_gmMap]
                 t=t*sign_g[None,None,:]   

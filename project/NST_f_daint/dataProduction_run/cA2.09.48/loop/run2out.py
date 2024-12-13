@@ -4,7 +4,7 @@ cat runAux/cfgs_runt | xargs -n 1 -I @ -P 10 python3 -u run2out.py -c @ > log/ru
 import os, click, h5py, re, pickle
 import numpy as np
 
-lat_L,lat_T=24,48
+lat_L,lat_T=48,96
 SorL='S'
 
 Gs=['id','gx','gy','gz','gt','g5','g5gx','g5gy','g5gz','g5gt','sgmyz','sgmzx','sgmxy','sgmtx','sgmty','sgmtz']
