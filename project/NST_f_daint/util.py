@@ -297,7 +297,67 @@ def addColHeader(axs,cols,fontsize='xx-large',**kargs):
     for ax, col in zip(axs[0,:], cols):
         ax.annotate(col, xy=(0.5, 1), xytext=(0, pad),
                 xycoords='axes fraction', textcoords='offset points', ha='center', va='baseline', fontsize=fontsize, **kargs)
+
+
+# GEVP
+def GEVP(Ct,t0List,tList=None,tvList=None):
+    '''
+    Ct: indexing from t=0
+    t0List>=0: t0=t0List
+    t0List<0: t0=t-|t0List|
+    tv: reference time for getting wave function (Not return wave function if tv is None) 
+    # Return #
+    eVecs (the one to combine source operators): return (time,n,i) but (time,i,n) in the middle
+    wave function returns if tv is not None
+    '''
+    Ct=Ct.astype(complex)
+    (t_total,N_op,N_op)=Ct.shape
+    if tList is None:
+        tList=range(t_total)
+    tList=np.array(tList)
+    if type(t0List)==int:
+        if t0List>=0:
+            t0List=[t0List for t in tList]
+        else:
+            t0List=[t+t0List if t+t0List>0 else 1 for t in tList]
+    elif type(t0List)==str:
+        if t0List=='t/2':
+            t0List=[(t+1)//2 for t in tList]
+    t0List=[t0 if t!=t0 else 0 if t!=0 else 1 for t,t0 in zip(tList,t0List)] # we would never use t==t0 case, this is meant to avoid some warning msg
+    t0List=np.array(t0List)
+    Ct0=Ct[t0List]
+    choL=np.linalg.cholesky(Ct0) # Ct0=choL@choL.H
+    choLInv=np.linalg.inv(choL)
+    choLInvDag=np.conj(np.transpose(choLInv,[0,2,1]))
+    w_Ct=choLInv@Ct[tList]@choLInvDag
+    (eVals,w_eVecs)=np.linalg.eig(w_Ct)
+    eVals=np.real(eVals)
+    
+    for ind,t in enumerate(tList):
+        t0=t0List[ind]
+        sortList=np.argsort(-eVals[ind]) if t0<t else np.argsort(eVals[ind]) 
+        (eVals[ind],w_eVecs[ind])=(eVals[ind][sortList],w_eVecs[ind][:,sortList])
+
+    eVecs=choLInvDag@w_eVecs
+    
+    if tvList is not None:
+        if type(tvList)==str:
+            if tvList=='t0':
+                tvList=t0List
+            elif tvList=='t':
+                tvList=tList
+        tvList=np.array(tvList)
+        tmp=np.conj(np.transpose(eVecs,[0,2,1]))@Ct[tvList]@eVecs
+        tmp=np.real(tmp[:,range(N_op),range(N_op)])
+        powers=np.array([ tv/(t-t0) if t!=t0 else 0 for t,t0,tv in zip(tList,t0List,tvList)])
+        fn=np.sqrt( tmp / (eVals**powers[:,None]))
+        eVecs_normalized=eVecs/fn[:,None,:]
+        eVecs_normalized=np.transpose(eVecs_normalized,[0,2,1]) # v^n_i
+        Zin=np.linalg.inv(eVecs_normalized) # (Z)_in
         
+        return (eVals,eVecs_normalized,Zin)
+
+    return (eVals,np.transpose(eVecs,[0,2,1]))
         
 # load
 
