@@ -204,7 +204,7 @@ def orth_rows(spM):
     aux_M = spM.tolist()
     size  = len(aux_M)
     aux_M = [ row for row in aux_M if row!=[0,]*size  ]
-    rank  = np.linalg.matrix_rank( np.array(aux_M,dtype=np.complex) )
+    rank  = np.linalg.matrix_rank( np.array(aux_M,dtype=np.complex128) )
     
     aux_M = spMatrix(aux_M).T
     Q, _  = _QRdecomposition(aux_M)

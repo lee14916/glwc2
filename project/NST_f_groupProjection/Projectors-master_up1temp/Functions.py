@@ -264,7 +264,7 @@ def add_out(row, linters):
     #'gs index expected'
         
     for i_i,i in enumerate(linters):
-        out[i] = np.array( row.evalf()[i_i*4:(i_i+1)*4], dtype=np.complex )
+        out[i] = np.array( row.evalf()[i_i*4:(i_i+1)*4], dtype=np.complex128 )
     for i in out:
         for i_s,s in enumerate(out[i]):
             l_str.append('[%s][%s]=%s'%(i,i_s,str(s)))
@@ -283,7 +283,7 @@ def add_out2p(row, i_obj):
         for i_i, (g1,g2) in enumerate(product(i_obj.l_inter[p1],i_obj.l_inter[p2])):
             i = g1+';'+g2
             assert(i_i==0)
-            out[m][i] = np.array( row.evalf()[i_m*4:(i_m+1)*4], dtype=np.complex )
+            out[m][i] = np.array( row.evalf()[i_m*4:(i_m+1)*4], dtype=np.complex128 )
     for m in out:
         for i in out[m]:
             for i_s,s in enumerate(out[m][i]):
