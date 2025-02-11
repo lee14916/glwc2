@@ -2,7 +2,7 @@ cB
 /p/arch/hch02/hch02b/cB211.072.64/twop_threep_dt20_64srcs/twop_${cfg}.h5: Nsrc~64
 /p/arch/hch02/hch02b/cB211.072.64/twop_threep_2/twop_${cfg}.h5: Nsrc~85
 /p/arch/hch02/hch02k/cB2.072.64_Nf211/twop...: Nsrc~200
-total~450
+total~349
 
 cC
 /p/arch/hch02/hch02b/cC211.60.80/${cfg}/twop_nucl_srcs650.h5: Nsrc~650 ('mvec' is in other files at the same directory)
