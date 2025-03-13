@@ -267,6 +267,9 @@ def un2str(x, xe, precision=2):
     fieldw = max(0, -no_exp)
     fmt = '%%.%df' % fieldw
     result2 = (fmt + '(%.0f)') % (no_int*10**no_exp, un_int*10**max(0, un_exp))
+    if un_exp<0 and un_int*10**un_exp>=1:
+        fmt2= '(%%.%df)' % (-un_exp)
+        result2 = (fmt + fmt2) % (no_int*10**no_exp, un_int*10**un_exp)
 
     # return shortest representation
     if len(result2) <= len(result1):
