@@ -3,7 +3,7 @@ cat data_aux/cfgs_run | xargs -n 1 -I @ -P 10 python3 -u base2post.py -c @ > log
 '''
 import os, click, h5py, re, pickle
 import numpy as np
-import aux
+import auxx as aux
 
 with open(aux.path_opabsDic,'rb') as f:
     opabsDic=pickle.load(f)

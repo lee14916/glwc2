@@ -4,7 +4,7 @@ cat data_aux/cfgs_run | xargs -n 1 -I @ -P 10 python3 -u out2post_NJNpi.py -c @ 
 '''
 import os, click, h5py, re, pickle
 import numpy as np
-import aux
+import auxx as aux
 
 postcode='NJNpi-Nsrc=4*1'
 def cfg2out(cfg):
