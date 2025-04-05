@@ -1,0 +1,26 @@
+ls /onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/strange_loops_D8/1488_r1
+
+loop_probD8.1488_r1_stoch_NeV0_Ns0001_step0001_Qsq64.h5
+loop_probD8.1488_r1_stoch_NeV200_Ns0001_step0001_Qsq64.h5
+
+Just ignore NeV200?
+
+NONE /onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/strange_loops_D8/1484_r1/loop_probD8.1484_r1_stoch_NeV200_Ns0001_step0001_Qsq64.h5
+NONE /onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/strange_loops_D8/1488_r1/loop_probD8.1488_r1_stoch_NeV200_Ns0001_step0001_Qsq64.h5
+NONE /onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/strange_loops_D8/1492_r1/loop_probD8.1492_r1_stoch_NeV200_Ns0001_step0001_Qsq64.h5
+NONE /onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/strange_loops_D8/1496_r1/loop_probD8.1496_r1_stoch_NeV200_Ns0001_step0001_Qsq64.h5
+NONE /onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/strange_loops_D8/1500_r1/loop_probD8.1500_r1_stoch_NeV200_Ns0001_step0001_Qsq64.h5
+NONE /onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/strange_loops_D8_S2/0500_r0/stS2_loop.py
+
+2D8?
+461 up to 23 Luis 1GeV?
+1419 up to 49 D8_S2
+2109 up to 64 others
+
+Loops vs LoopsCv
+LpsDw vs LpsDwCv
+oneD vs oneDC
+
+required tensor components?
+
+
