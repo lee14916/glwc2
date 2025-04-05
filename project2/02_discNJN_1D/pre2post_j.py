@@ -1,3 +1,4 @@
+# cyclone
 '''
 cat data_aux/cfgs_all_j | xargs -n 1 -I @ -P 10 python3 -u pre2post_j.py -c @ > log/pre2post_j.out & 
 '''

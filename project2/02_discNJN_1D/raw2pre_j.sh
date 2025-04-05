@@ -1,4 +1,4 @@
-# cyclone run
+# cyclone
 path=/onyx/qdata/khadjiyiannakou/cB2.072.64_Nf211/disconnected/light_loops/
 path_pre=/nvme/h/cy22yl1/projectData/02_discNJN_1D/cB211.072.64/data_pre_j/
 for cfg in `ls ${path}`
