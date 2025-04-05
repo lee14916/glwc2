@@ -1,11 +1,11 @@
-import os,h5py
+import os,h5py,warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import math,cmath
 from math import floor, log10
 import pickle
-from scipy.optimize import leastsq, curve_fit
+from scipy.optimize import leastsq, curve_fit, fsolve
 from scipy.linalg import solve_triangular,cholesky
 from inspect import signature
 
@@ -13,6 +13,12 @@ flag_fast=False # If True, certain functions will be speeded up using approximat
 
 deepKey=lambda dic,n: dic if n==0 else deepKey(dic[list(dic.keys())[0]],n-1)
 npRound=lambda dat,n:np.round(np.array(dat).astype(float),n)
+
+def fsolve2(func,x0):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res=fsolve(func, x0)[0]
+    return res if res!=x0 else np.NaN
 
 def propagateError(func,mean,cov):
     '''
