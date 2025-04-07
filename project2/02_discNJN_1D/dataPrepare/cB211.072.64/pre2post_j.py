@@ -30,7 +30,6 @@ gamma_3=gamma_z=np.array([[0.,0.,1j,0.],[0.,0.,0.,-1j],[-1j,0.,0.,0.],[0.,1j,0.,
 gamma_4=gamma_t=np.array([[1.,0.,0.,0.],[0.,1.,0.,0.],[0.,0.,-1.,0.],[0.,0.,0.,-1.]])
 gamma_5=(gamma_1@gamma_2@gamma_3@gamma_4)
 
-# gms=['id','gx','gy','gz','gt','g5','g5gx','g5gy','g5gz','g5gt','sgmxy','sgmyz','sgmzx','sgmtx','sgmty','sgmtz']
 gms=['id','gx','gy','gz','gt','g5','g5gx','g5gy','g5gz','g5gt','sgmyz','sgmzx','sgmxy','sgmtx','sgmty','sgmtz']
 
 t=1/2
@@ -64,271 +63,176 @@ def run(cfg):
             pass
         with h5py.File(outfile, 'w') as fw:
             fw.create_dataset('mvec',data=target_momList)
+            fw.create_dataset('inserts',data=gms)
             if 'j.h5_exact' in files and 'j.h5_stoch' in files:
-                t_std=t_gen=0
-                with h5py.File(inpath+'j.h5_exact') as fe, h5py.File(inpath+'j.h5_stoch') as fs:
-                    Ndivide=1*512
-                    ky_cfg='conf_'+cfg[1:]
-                            
-                    moms=fe['Momenta_list_xyz']
-                    momDic={}
-                    for i,mom in enumerate(moms):
-                        momDic[tuple(mom)]=i
-                    momMap=[momDic[tuple(mom)] for mom in target_momList]
+                for case in ['local','d0','d1','d2','d3']:
+                    case2={'local':'local','d0':'dir_00','d1':'dir_01','d2':'dir_02','d3':'dir_03'}[case]
+                    case3={'local':'local','d0':'dir0','d1':'dir1','d2':'dir2','d3':'dir3'}[case]
                     
-                    t=fe[ky_cfg]['Scalar']['loop'][:] + fs[ky_cfg]['Nstoch_0001']['Scalar']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=t[:,momMap]
-                    t=np.reshape(t,[t.shape[0],-1,4,4])
-                    t_std+=t
+                    t_std=t_gen=0
+                    with h5py.File(inpath+'j.h5_exact') as fe, h5py.File(inpath+'j.h5_stoch') as fs:
+                        Ndivide=1*512
+                        ky_cfg='conf_'+cfg[1:]
+                                
+                        moms=fe['Momenta_list_xyz']
+                        momDic={}
+                        for i,mom in enumerate(moms):
+                            momDic[tuple(mom)]=i
+                        momMap=[momDic[tuple(mom)] for mom in target_momList]
+                        
+                        if case in ['local']:
+                            t=fe[ky_cfg]['Scalar']['loop'][:] + fs[ky_cfg]['Nstoch_0001']['Scalar']['loop'][:]/Ndivide
+                        else:
+                            t=fe[ky_cfg]['Loops'][case2]['loop'][:] + fs[ky_cfg]['Nstoch_0001']['Loops'][case2]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=t[:,momMap]
+                        t=np.reshape(t,[t.shape[0],-1,4,4])
+                        t_std+=t
+                        
+                        if case in ['local']:
+                            t=fe[ky_cfg]['dOp']['loop'][:] + fs[ky_cfg]['Nstoch_0001']['dOp']['loop'][:]/Ndivide
+                        else:
+                            t=fe[ky_cfg]['LpsDw'][case2]['loop'][:] + fs[ky_cfg]['Nstoch_0001']['LpsDw'][case2]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=t[:,momMap]
+                        t=np.reshape(t,[t.shape[0],-1,4,4])
+                        t_gen+=t
+                        
+                    # print(t_std.shape) # targe: t,m,a,b
                     
-                    t=fe[ky_cfg]['dOp']['loop'][:] + fs[ky_cfg]['Nstoch_0001']['dOp']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=t[:,momMap]
-                    t=np.reshape(t,[t.shape[0],-1,4,4])
-                    t_gen+=t
-                    
-                # print(t_std.shape) # targe: t,m,a,b
-                
-                N_S=1
-                t_std=t_std*(-8*1j*MUL*KAPPA**2)/N_S
-                t_gen=t_gen*(-4*KAPPA)/N_S
+                    N_S=1
+                    t_std=t_std*(-8*1j*MUL*KAPPA**2)/N_S
+                    t_gen=t_gen*(-4*KAPPA)/N_S
 
-                t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
-                t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
-                
-                fw.create_dataset('data/j+',data=t_p)
-                fw.create_dataset('data/j-',data=t_m)
+                    t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
+                    t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
+                    
+                    label='' if case in ['local'] else '_'+case
+                    fw.create_dataset('data/j+'+label,data=t_p)
+                    fw.create_dataset('data/j-'+label,data=t_m)
                 
             if 'js.h5_stoch_D8' in files and 'js.h5_stoch_gen_D8_S2' in files and 'js.h5_stoch_std_D8_S2' in files:
-                N_S=0
-                t_std=t_gen=0
-                with h5py.File(inpath+'js.h5_stoch_D8') as fs:
-                    N_S+=1
-                    Ndivide=1*512
-                    ky_cfg='conf_'+cfg[1:]
-                
-                    moms=fs['Momenta_list_xyz']
-                    momDic={}
-                    for i,mom in enumerate(moms):
-                        momDic[tuple(mom)]=i
-                    momMap=[momDic[tuple(mom)] for mom in target_momList]
+                for case in ['local','d0','d1','d2','d3']:
+                    case2={'local':'local','d0':'dir_00','d1':'dir_01','d2':'dir_02','d3':'dir_03'}[case]
+                    case3={'local':'local','d0':'dir0','d1':'dir1','d2':'dir2','d3':'dir3'}[case]
                     
-                    t=fs[ky_cfg]['Nstoch_0001']['Scalar']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=t[:,momMap]
-                    t=np.reshape(t,[t.shape[0],-1,4,4])
-                    t_std+=t
+                    N_S=0
+                    t_std=t_gen=0
+                    with h5py.File(inpath+'js.h5_stoch_D8') as fs:
+                        N_S+=1
+                        Ndivide=1*512
+                        ky_cfg='conf_'+cfg[1:]
                     
-                    t=fs[ky_cfg]['Nstoch_0001']['dOp']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=t[:,momMap]
-                    t=np.reshape(t,[t.shape[0],-1,4,4])
-                    t_gen+=t
-                    
-                with h5py.File(inpath+'js.h5_stoch_std_D8_S2') as fss, h5py.File(inpath+'js.h5_stoch_gen_D8_S2') as fsg:
-                    N_S+=1
-                    Ndivide=1*512
-                    ky_cfg='Conf'+cfg_old
-                    
-                    moms=fss[ky_cfg]['Ns0']['localLoops']['mvec']
-                    momDic={}
-                    for i,mom in enumerate(moms):
-                        momDic[tuple(mom)]=i
-                    momMap=[momDic[tuple(mom)] for mom in target_momList]
+                        moms=fs['Momenta_list_xyz']
+                        momDic={}
+                        for i,mom in enumerate(moms):
+                            momDic[tuple(mom)]=i
+                        momMap=[momDic[tuple(mom)] for mom in target_momList]
+                        
+                        if case in ['local']:
+                            t=fs[ky_cfg]['Nstoch_0001']['Scalar']['loop'][:]/Ndivide
+                        else:
+                            t=fs[ky_cfg]['Nstoch_0001']['Loops'][case2]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=t[:,momMap]
+                        t=np.reshape(t,[t.shape[0],-1,4,4])
+                        t_std+=t
+                        
+                        if case in ['local']:
+                            t=fs[ky_cfg]['Nstoch_0001']['dOp']['loop'][:]/Ndivide
+                        else:
+                            t=fs[ky_cfg]['Nstoch_0001']['LpsDw'][case2]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=t[:,momMap]
+                        t=np.reshape(t,[t.shape[0],-1,4,4])
+                        t_gen+=t
+                        
+                    with h5py.File(inpath+'js.h5_stoch_std_D8_S2') as fss, h5py.File(inpath+'js.h5_stoch_gen_D8_S2') as fsg:
+                        N_S+=1
+                        Ndivide=1*512
+                        ky_cfg='Conf'+cfg_old
+                        
+                        if case in ['local']:
+                            moms=fss[ky_cfg]['Ns0']['localLoops']['mvec']
+                        else:
+                            moms=fss[ky_cfg]['Ns0']['oneD'][case3]['mvec']
+                        momDic={}
+                        for i,mom in enumerate(moms):
+                            momDic[tuple(mom)]=i
+                        momMap=[momDic[tuple(mom)] for mom in target_momList]
 
-                    t=fss[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=np.transpose(t,[0,3,1,2])
-                    t=t[:,momMap]
-                    t_std+=t
+                        if case in ['local']:
+                            t=fss[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
+                        else:
+                            t=fss[ky_cfg]['Ns0']['oneD'][case3]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=np.transpose(t,[0,3,1,2])
+                        t=t[:,momMap]
+                        t_std+=t
+                        
+                        if case in ['local']:
+                            t=fsg[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
+                        else:
+                            t=fsg[ky_cfg]['Ns0']['oneD'][case3]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=np.transpose(t,[0,3,1,2])
+                        t=t[:,momMap]
+                        t_gen+=t
                     
-                    t=fsg[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=np.transpose(t,[0,3,1,2])
-                    t=t[:,momMap]
-                    t_gen+=t
-                
-                t_std=t_std*(-8*1j*MUS*KAPPA**2)/N_S
-                t_gen=t_gen*(-4*KAPPA)/N_S
+                    t_std=t_std*(-8*1j*MUS*KAPPA**2)/N_S
+                    t_gen=t_gen*(-4*KAPPA)/N_S
 
-                t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
-                t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
-                
-                fw.create_dataset('data/js',data=t_p/2)
+                    t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
+                    t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
+                    
+                    label='' if case in ['local'] else '_'+case
+                    fw.create_dataset('data/js'+label,data=t_p/2)
                 
             if 'jc.h5_stoch' in files:
-                t_std=t_gen=0
-                with h5py.File(inpath+'jc.h5_stoch') as fs:
-                    Ndivide=12*32
-                    ky_cfg='conf_'+cfg[1:]
-                
-                    moms=fs['Momenta_list_xyz']
-                    momDic={}
-                    for i,mom in enumerate(moms):
-                        momDic[tuple(mom)]=i
-                    momMap=[momDic[tuple(mom)] for mom in target_momList]
+                for case in ['local','d0','d1','d2','d3']:
+                    case2={'local':'local','d0':'dir_00','d1':'dir_01','d2':'dir_02','d3':'dir_03'}[case]
+                    case3={'local':'local','d0':'dir0','d1':'dir1','d2':'dir2','d3':'dir3'}[case]
                     
-                    t=fs[ky_cfg]['Nstoch_0012']['Scalar']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=t[:,momMap]
-                    t=np.reshape(t,[t.shape[0],-1,4,4])
-                    t_std+=t
+                    t_std=t_gen=0
+                    with h5py.File(inpath+'jc.h5_stoch') as fs:
+                        Ndivide=12*32
+                        ky_cfg='conf_'+cfg[1:]
                     
-                    t=fs[ky_cfg]['Nstoch_0012']['dOp']['loop'][:]/Ndivide
-                    t=t[...,0]+1j*t[...,1]
-                    t=t[:,momMap]
-                    t=np.reshape(t,[t.shape[0],-1,4,4])
-                    t_gen+=t
-                    
-                N_S=1
-                t_std=t_std*(-8*1j*MUC*KAPPA**2)/N_S
-                t_gen=t_gen*(-4*KAPPA)/N_S
+                        moms=fs['Momenta_list_xyz']
+                        momDic={}
+                        for i,mom in enumerate(moms):
+                            momDic[tuple(mom)]=i
+                        momMap=[momDic[tuple(mom)] for mom in target_momList]
+                        
+                        if case in ['local']:
+                            t=fs[ky_cfg]['Nstoch_0012']['Scalar']['loop'][:]/Ndivide
+                        else:
+                            t=fs[ky_cfg]['Nstoch_0012']['Loops'][case2]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=t[:,momMap]
+                        t=np.reshape(t,[t.shape[0],-1,4,4])
+                        t_std+=t
+                        
+                        if case in ['local']:
+                            t=fs[ky_cfg]['Nstoch_0012']['dOp']['loop'][:]/Ndivide
+                        else:
+                            t=fs[ky_cfg]['Nstoch_0012']['LpsDw'][case2]['loop'][:]/Ndivide
+                        t=t[...,0]+1j*t[...,1]
+                        t=t[:,momMap]
+                        t=np.reshape(t,[t.shape[0],-1,4,4])
+                        t_gen+=t
+                        
+                    N_S=1
+                    t_std=t_std*(-8*1j*MUC*KAPPA**2)/N_S
+                    t_gen=t_gen*(-4*KAPPA)/N_S
 
-                t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
-                t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
-                
-                fw.create_dataset('data/jc',data=t_p/2)
+                    t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
+                    t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
+                    
+                    label='' if case in ['local'] else '_'+case
+                    fw.create_dataset('data/jc'+label,data=t_p/2)
             
         os.remove(outfile_flag)
     print('flag_cfg_done: '+cfg)
         
 run()
-
-
-# for i_cfg,cfg in enumerate(cfgs):
-#     if i_cfg<=620:
-#         continue
-#     os.makedirs(outpath+cfg,exist_ok=True)
-#     with h5py.File(outpath+cfg+'/j.h5', 'w') as fw:
-#         fw.create_dataset('mvec',data=target_momList)
-
-#         # j
-#         t_std=t_gen=0
-#         with h5py.File(inpath+cfg+'/j.h5_exact') as fe, h5py.File(inpath+cfg+'/j.h5_stoch') as fs:
-#             Ndivide=1*512
-#             ky_cfg='conf_'+cfg[:-3]
-                    
-#             moms=fe['Momenta_list_xyz']
-#             momDic={}
-#             for i,mom in enumerate(moms):
-#                 momDic[tuple(mom)]=i
-#             momMap=[momDic[tuple(mom)] for mom in target_momList]
-            
-#             t=fe[ky_cfg]['Scalar']['loop'][:] + fs[ky_cfg]['Nstoch_0001']['Scalar']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=t[:,momMap]
-#             t=np.reshape(t,[t.shape[0],-1,4,4])
-#             t_std+=t
-            
-#             t=fe[ky_cfg]['dOp']['loop'][:] + fs[ky_cfg]['Nstoch_0001']['dOp']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=t[:,momMap]
-#             t=np.reshape(t,[t.shape[0],-1,4,4])
-#             t_gen+=t
-            
-#         # print(t_std.shape) # targe: t,m,a,b
-        
-#         N_S=1
-#         t_std=t_std*(-8*1j*MUL*KAPPA**2)/N_S
-#         t_gen=t_gen*(-4*KAPPA)/N_S
-
-#         t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
-#         t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
-        
-#         fw.create_dataset('data/j+',data=t_p)
-#         fw.create_dataset('data/j-',data=t_m)
-        
-#         # js
-#         N_S=0
-#         t_std=t_gen=0
-#         with h5py.File(inpath+cfg+'/js.h5_stoch_D8') as fs:
-#             N_S+=1
-#             Ndivide=1*512
-#             ky_cfg='conf_'+cfg[:-3]
-        
-#             moms=fs['Momenta_list_xyz']
-#             momDic={}
-#             for i,mom in enumerate(moms):
-#                 momDic[tuple(mom)]=i
-#             momMap=[momDic[tuple(mom)] for mom in target_momList]
-            
-#             t=fs[ky_cfg]['Nstoch_0001']['Scalar']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=t[:,momMap]
-#             t=np.reshape(t,[t.shape[0],-1,4,4])
-#             t_std+=t
-            
-#             t=fs[ky_cfg]['Nstoch_0001']['dOp']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=t[:,momMap]
-#             t=np.reshape(t,[t.shape[0],-1,4,4])
-#             t_gen+=t
-            
-#         with h5py.File(inpath+cfg+'/js.h5_stoch_std_D8_S2') as fss, h5py.File(inpath+cfg+'/js.h5_stoch_gen_D8_S2') as fsg:
-#             N_S+=1
-#             Ndivide=1*512
-#             ky_cfg='Conf'+cfg
-            
-#             moms=fss[ky_cfg]['Ns0']['localLoops']['mvec']
-#             momDic={}
-#             for i,mom in enumerate(moms):
-#                 momDic[tuple(mom)]=i
-#             momMap=[momDic[tuple(mom)] for mom in target_momList]
-
-#             t=fss[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=np.transpose(t,[0,3,1,2])
-#             t=t[:,momMap]
-#             t_std+=t
-            
-#             t=fsg[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=np.transpose(t,[0,3,1,2])
-#             t=t[:,momMap]
-#             t_gen+=t
-        
-#         t_std=t_std*(-8*1j*MUS*KAPPA**2)/N_S
-#         t_gen=t_gen*(-4*KAPPA)/N_S
-
-#         t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
-#         t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
-        
-#         fw.create_dataset('data/js',data=t_p/2)
-        
-#         # jc
-#         t_std=t_gen=0
-#         with h5py.File(inpath+cfg+'/jc.h5_stoch') as fs:
-#             Ndivide=12*32
-#             ky_cfg='conf_'+cfg[:-3]
-        
-#             moms=fs['Momenta_list_xyz']
-#             momDic={}
-#             for i,mom in enumerate(moms):
-#                 momDic[tuple(mom)]=i
-#             momMap=[momDic[tuple(mom)] for mom in target_momList]
-            
-#             t=fs[ky_cfg]['Nstoch_0012']['Scalar']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=t[:,momMap]
-#             t=np.reshape(t,[t.shape[0],-1,4,4])
-#             t_std+=t
-            
-#             t=fs[ky_cfg]['Nstoch_0012']['dOp']['loop'][:]/Ndivide
-#             t=t[...,0]+1j*t[...,1]
-#             t=t[:,momMap]
-#             t=np.reshape(t,[t.shape[0],-1,4,4])
-#             t_gen+=t
-            
-#         N_S=1
-#         t_std=t_std*(-8*1j*MUC*KAPPA**2)/N_S
-#         t_gen=t_gen*(-4*KAPPA)/N_S
-
-#         t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
-#         t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
-        
-#         fw.create_dataset('data/jc',data=t_p/2)
-    
-#     print(i_cfg+1,len(cfgs),cfg,end='                                   \r')    
-#     # break
-    
