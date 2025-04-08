@@ -1,3 +1,9 @@
+N1=p; N2=n 
+d0,d1,d2,d3 = dx,dy,dz,dt
+
+
+
+
 cB
 /p/arch/hch02/hch02b/cB211.072.64/twop_threep_dt20_64srcs/twop_${cfg}.h5: Nsrc~64
 /p/arch/hch02/hch02b/cB211.072.64/twop_threep_2/twop_${cfg}.h5: Nsrc~85
