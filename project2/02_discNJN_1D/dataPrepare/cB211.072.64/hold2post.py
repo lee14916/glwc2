@@ -76,7 +76,7 @@ def run(cfg):
             with open(outfile_flag,'w') as f:
                 pass
             with h5py.File(outfile,'w') as fw, h5py.File(f'{inpath}{file}') as fr:
-                fw.create_dataset('notes',data=['time,mom,insert','g{m,Dn} = (gamma_mu D_nu + gamma_nu D_mu)/2; tl=traceless', 'sgm_[m{n],Dr} = sgm_'])
+                fw.create_dataset('notes',data=['time,mom,insert','g{m,Dn} = (gamma_mu D_nu + gamma_nu D_mu)/2; tl=traceless', 'SGM[m{n],Dr} = sgm_', 'SGMmn=[gm,gn]/2'])
                 fw.create_dataset('moms',data=moms_j)
                 moms=[list(mom) for mom in fr['moms'][:]]
                 momMap=[moms.index(mom) for mom in moms_j]
@@ -85,67 +85,86 @@ def run(cfg):
                 
                 txyz=['t','x','y','z']; txyz2ind={'t':0,'x':1,'y':2,'z':3}
                 insert2d={'x':'0','y':'1','z':'2','t':'3'}
-                for j in ['j+','js','jc']:
+                for ind_j,j in enumerate(['j+','js','jc']):
                     case='id,Dm'; inserts=txyz
-                    fw.create_dataset(f'inserts_{case}',data=inserts)
-                    t=np.array([fr[f'data/{j}_d{insert2d[m]}'][:,momMap,gms.index(f'id')] for m in inserts])
+                    if ind_j==0:
+                        fw.create_dataset(f'inserts;{case}',data=inserts)
+                    t=np.array([fr[f'data/{j};d{insert2d[m]}'][:,momMap,gms.index(f'id')] for m in inserts])
                     t=np.transpose(t,[1,2,0])
-                    fw.create_dataset(f'data/{j}_{case}',data=t)
+                    fw.create_dataset(f'data/{j};{case}',data=t)
                     
                     case='g5,Dm'; inserts=txyz
-                    fw.create_dataset(f'inserts_{case}',data=inserts)
-                    t=np.array([fr[f'data/{j}_d{insert2d[m]}'][:,momMap,gms.index(f'g5')] for m in inserts])
+                    if ind_j==0:
+                        fw.create_dataset(f'inserts;{case}',data=inserts)
+                    t=np.array([fr[f'data/{j};d{insert2d[m]}'][:,momMap,gms.index(f'g5')] for m in inserts])
                     t=np.transpose(t,[1,2,0])
-                    fw.create_dataset(f'data/{j}_{case}',data=t)
+                    fw.create_dataset(f'data/{j};{case}',data=t)
                     
-                    case='g{m,Dn}_tl'; inserts=['tt','tx','ty','tz','xx','xy','xz','yy','yz','zz']
-                    fw.create_dataset(f'inserts_{case}',data=inserts)
-                    t=np.array([[fr[f'data/{j}_d{insert2d[n]}'][:,momMap,gms.index(f'g{m}')] for n in txyz] for m in txyz])
+                    case='g{m,Dn};tl'; inserts=['tt','tx','ty','tz','xx','xy','xz','yy','yz','zz']
+                    if ind_j==0:
+                        fw.create_dataset(f'inserts;{case}',data=inserts)
+                    t=np.array([[fr[f'data/{j};d{insert2d[n]}'][:,momMap,gms.index(f'g{m}')] for n in txyz] for m in txyz])
                     t=(t+np.transpose(t,[1,0,2,3]))/2
                     t=t - np.eye(4)[:,:,None,None]*np.trace(t,axis1=0,axis2=1)[None,None,:,:]/4
                     t=[t[txyz.index(m),txyz.index(n)] for m,n in inserts]
                     t=np.transpose(t,[1,2,0])
-                    fw.create_dataset(f'data/{j}_{case}',data=t)
+                    fw.create_dataset(f'data/{j};{case}',data=t)
                     
                     # case='g5gm,Dn'; inserts=['tt','tx','ty','tz','xt','xx','xy','xz','yt','yx','yy','yz','zt','zx','zy','zz']
-                    # fw.create_dataset(f'inserts_{case}',data=inserts)
-                    # t=np.array([fr[f'data/{j}_d{insert2d[n]}'][:,momMap,gms.index(f'g5g{m}')] for m,n in inserts])
+                    # fw.create_dataset(f'inserts;{case}',data=inserts)
+                    # t=np.array([fr[f'data/{j};d{insert2d[n]}'][:,momMap,gms.index(f'g5g{m}')] for m,n in inserts])
                     # t=np.transpose(t,[1,2,0])
-                    # fw.create_dataset(f'data/{j}_{case}',data=t)
+                    # fw.create_dataset(f'data/{j};{case}',data=t)
                     #
-                    case='g5g{m,Dn}_tl'; inserts=['tt','tx','ty','tz','xx','xy','xz','yy','yz','zz']
-                    fw.create_dataset(f'inserts_{case}',data=inserts)
-                    t=np.array([[fr[f'data/{j}_d{insert2d[n]}'][:,momMap,gms.index(f'g5g{m}')] for n in txyz] for m in txyz])
+                    case='g5g{m,Dn};tl'; inserts=['tt','tx','ty','tz','xx','xy','xz','yy','yz','zz']
+                    if ind_j==0:
+                        fw.create_dataset(f'inserts;{case}',data=inserts)
+                    t=np.array([[fr[f'data/{j};d{insert2d[n]}'][:,momMap,gms.index(f'g5g{m}')] for n in txyz] for m in txyz])
                     t=(t+np.transpose(t,[1,0,2,3]))/2
                     t=t - np.eye(4)[:,:,None,None]*np.trace(t,axis1=0,axis2=1)[None,None,:,:]/4
                     t=[t[txyz.index(m),txyz.index(n)] for m,n in inserts]
                     t=np.transpose(t,[1,2,0])
-                    fw.create_dataset(f'data/{j}_{case}',data=t)
+                    fw.create_dataset(f'data/{j};{case}',data=t)
                     #
                     case='g5g[m,Dn]'; inserts=['tx','ty','tz','xy','xz','yz']
-                    fw.create_dataset(f'inserts_{case}',data=inserts)
-                    t=np.array([[fr[f'data/{j}_d{insert2d[n]}'][:,momMap,gms.index(f'g{m}')] for n in txyz] for m in txyz])
+                    if ind_j==0:
+                        fw.create_dataset(f'inserts;{case}',data=inserts)
+                    t=np.array([[fr[f'data/{j};d{insert2d[n]}'][:,momMap,gms.index(f'g{m}')] for n in txyz] for m in txyz])
                     t=(t-np.transpose(t,[1,0,2,3]))/2
                     t=[t[txyz.index(m),txyz.index(n)] for m,n in inserts]
                     t=np.transpose(t,[1,2,0])
-                    fw.create_dataset(f'data/{j}_{case}',data=t)
+                    fw.create_dataset(f'data/{j};{case}',data=t)
                     
-                    case='SGM[m{n],Dr}_tl'; inserts=['txx','txy','txz','tyy','tyz','tzz','xyy','xyz','yzz','yzz']
-                    fw.create_dataset(f'inserts_{case}',data=inserts)
+                    case='SGMmn,Dr'; inserts=['txt','tyt','tzt','xyt','xzt','yzt', 'txx','tyx','tzx','xyx','xzx','yzx', \
+                        'txy','tyy','tzy','xyy','xzy','yzy', 'txz','tyz','tzz','xyz','xzz','yzz']
+                    if ind_j==0:
+                        fw.create_dataset(f'inserts;{case}',data=inserts)
                     def get(m,n,r):
                         if m==n:
-                            return 0 * fr[f'data/{j}_d{insert2d["t"]}'][:,momMap,gms.index(f'sgmxy')]
+                            return 0 * fr[f'data/{j};d{insert2d["t"]}'][:,momMap,gms.index(f'sgmxy')]
                         if f'sgm{m}{n}' in gms:
-                            return fr[f'data/{j}_d{insert2d[r]}'][:,momMap,gms.index(f'sgm{m}{n}')] 
-                        return fr[f'data/{j}_d{insert2d[r]}'][:,momMap,gms.index(f'sgm{n}{m}')] 
-                    t=np.array([[[get(m,n,r) for r in txyz] for n in txyz] for m in txyz])
-                    t=np.array([t[i] - np.eye(4)[:,:,None,None]*np.trace(t[i],axis1=0,axis2=1)[None,None,:,:]/4 for i in range(4)])
-                    orders=[[0,1,2],[0,2,1],[2,1,0],[1,0,2],[2,0,1],[1,2,0]]; sgns=[1,1,1,-1,-1,-1]
-                    t=np.mean([sgn*np.transpose(t,order+[3,4]) for order,sgn in zip(orders,sgns)],axis=0)
-                    # t=np.array([t[i] - np.eye(4)[:,:,None,None]*np.trace(t[i],axis1=0,axis2=1)[None,None,:,:]/4 for i in range(4)])
-                    t=[t[txyz.index(m),txyz.index(n),txyz.index(r)] for m,n,r in inserts]
+                            return fr[f'data/{j};d{insert2d[r]}'][:,momMap,gms.index(f'sgm{m}{n}')] 
+                        return -fr[f'data/{j};d{insert2d[r]}'][:,momMap,gms.index(f'sgm{n}{m}')] 
+                    t=np.array([get(m,n,r) for m,n,r in inserts])
                     t=np.transpose(t,[1,2,0])
-                    fw.create_dataset(f'data/{j}_{case}',data=t)
+                    fw.create_dataset(f'data/{j};{case}',data=t)
+                    
+                    # case='SGM[m{n],Dr};tl'; inserts=['txx','txy','txz','tyy','tyz','tzz','xyy','xyz','yzz','yzz']
+                    # fw.create_dataset(f'inserts;{case}',data=inserts)
+                    # def get(m,n,r):
+                    #     if m==n:
+                    #         return 0 * fr[f'data/{j};d{insert2d["t"]}'][:,momMap,gms.index(f'sgmxy')]
+                    #     if f'sgm{m}{n}' in gms:
+                    #         return fr[f'data/{j};d{insert2d[r]}'][:,momMap,gms.index(f'sgm{m}{n}')] 
+                    #     return -fr[f'data/{j};d{insert2d[r]}'][:,momMap,gms.index(f'sgm{n}{m}')] 
+                    # t=np.array([[[get(m,n,r) for r in txyz] for n in txyz] for m in txyz])
+                    # t=np.array([t[i] - np.eye(4)[:,:,None,None]*np.trace(t[i],axis1=0,axis2=1)[None,None,:,:]/4 for i in range(4)])
+                    # orders=[[0,1,2],[0,2,1],[2,1,0],[1,0,2],[2,0,1],[1,2,0]]; sgns=[1,1,1,-1,-1,-1]
+                    # t=np.mean([sgn*np.transpose(t,order+[3,4]) for order,sgn in zip(orders,sgns)],axis=0)
+                    # # t=np.array([t[i] - np.eye(4)[:,:,None,None]*np.trace(t[i],axis1=0,axis2=1)[None,None,:,:]/4 for i in range(4)])
+                    # t=[t[txyz.index(m),txyz.index(n),txyz.index(r)] for m,n,r in inserts]
+                    # t=np.transpose(t,[1,2,0])
+                    # fw.create_dataset(f'data/{j};{case}',data=t)
                 
             os.remove(outfile_flag)
             
