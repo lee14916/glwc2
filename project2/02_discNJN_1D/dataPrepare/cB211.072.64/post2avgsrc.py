@@ -40,19 +40,18 @@ def run(cfg):
     
     with h5py.File(f'{inpath}j.h5') as fj:
         flas=['N_N']
-        # js=['j+;g{m,Dn};tl']
-        js_out=list(fj['data'].keys())
-        js_out.sort()
-        for j in js_out:
+        # js=['j+;id,Dm','js;id,Dm']
+        js=list(fj['data'].keys())
+        js.sort()
+        for j in js:
             outfile=f'{outpath}discNJN_{j}.h5'
             outfile_flag=outfile+'_flag'
             if (not os.path.isfile(outfile)) or os.path.isfile(outfile_flag):
                 with open(outfile_flag,'w') as f:
                     pass
                 
-                js_in=[j]
-                data={(fla,tf,j):0 for fla in flas for tf in tfs for j in js_in}
-                data_bw={(fla,tf,j):0 for fla in flas for tf in tfs for j in js_in}
+                data={(fla,tf,j):0 for fla in flas for tf in tfs}
+                data_bw={(fla,tf,j):0 for fla in flas for tf in tfs}
                 Nsrc=0
                 for file in files:
                     flag_setup=True
@@ -75,29 +74,28 @@ def run(cfg):
                             # print(Nsrc,end='                     \r')
                             
                             for fla in flas:
-                                for j in js_in:
-                                    datj=fj[f'data/{j}'][:]
-                                    datj=datj*tPhase[None,:,None]
-                                    for tf in tfs:
-                                        # (time,mom,dirac/proj,insert)
-                                        tN=fN[f'data/{src}/N_N'][tf,:]
-                                        tN=tN[momMap_N]
-                                        tN=np.transpose(tN[...,None,None],[2,0,1,3])
-                                        # print(tN.shape)
-                                        tj=np.roll(datj,-st,axis=0)[:tf+1]
-                                        tj=np.transpose(tj[:,momMap_j][...,None],[0,1,3,2])
-                                        # print(tj.shape)
-                                        data[(fla,tf,j)] += tN*tj
-                                    
-                                        # (time,mom,dirac/proj,insert)
-                                        tN=fN[f'data_bw/{src}/N_N'][-tf,:]
-                                        tN=tN[momMap_N]
-                                        tN=np.transpose(tN[...,None,None],[2,0,1,3])
-                                        # print(tN.shape)
-                                        tj=np.roll(datj,-st-1,axis=0)[::-1][:tf+1]
-                                        tj=np.transpose(tj[:,momMap_j][...,None],[0,1,3,2])
-                                        # print(tj.shape)
-                                        data_bw[(fla,tf,j)] += tN*tj
+                                datj=fj[f'data/{j}'][:]
+                                datj=datj*tPhase[None,:,None]
+                                for tf in tfs:
+                                    # (time,mom,dirac/proj,insert)
+                                    tN=fN[f'data/{src}/N_N'][tf,:]
+                                    tN=tN[momMap_N]
+                                    tN=np.transpose(tN[...,None,None],[2,0,1,3])
+                                    # print(tN.shape)
+                                    tj=np.roll(datj,-st,axis=0)[:tf+1]
+                                    tj=np.transpose(tj[:,momMap_j][...,None],[0,1,3,2])
+                                    # print(tj.shape)
+                                    data[(fla,tf,j)] += tN*tj
+                                
+                                    # (time,mom,dirac/proj,insert)
+                                    tN=fN[f'data_bw/{src}/N_N'][-tf,:]
+                                    tN=tN[momMap_N]
+                                    tN=np.transpose(tN[...,None,None],[2,0,1,3])
+                                    # print(tN.shape)
+                                    tj=np.roll(datj,-st-1,axis=0)[::-1][:tf+1]
+                                    tj=np.transpose(tj[:,momMap_j][...,None],[0,1,3,2])
+                                    # print(tj.shape)
+                                    data_bw[(fla,tf,j)] += tN*tj
                                         
                             # if Nsrc==10:
                             #     break
@@ -106,12 +104,13 @@ def run(cfg):
                 with h5py.File(outfile,'w') as fw:
                     fw.create_dataset('notes',data=['time,mom,proj,insert','mom=[sink,ins]; sink+ins=src','proj=[P0,Px,Py,Pz]'])
                     fw.create_dataset('moms',data=moms_target)
-                    ky=f'inserts_{j}'
+                    t=j.split(';')[1:]; t=';'.join(t)
+                    ky=f'inserts;{t}'
                     fw.create_dataset(ky,data=fj[ky][:])
-                    for key,val in data.items():
+                    for key in data:
                         fla,tf,j=key
-                        fw.create_dataset(f'data/{fla}_{j}_{tf}',data=data[(fla,tf,j)]/Nsrc)
-                        fw.create_dataset(f'data_bw/{fla}_{j}_{tf}',data=data_bw[(fla,tf,j)]/Nsrc)
+                        fw.create_dataset(f'data/{fla}_{j}_{tf}',data=data[key]/Nsrc)
+                        fw.create_dataset(f'data_bw/{fla}_{j}_{tf}',data=data_bw[key]/Nsrc)
                             
                 os.remove(outfile_flag)
                 
