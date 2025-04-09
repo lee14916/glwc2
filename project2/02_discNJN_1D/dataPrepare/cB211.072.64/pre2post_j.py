@@ -62,7 +62,7 @@ def run(cfg):
         with open(outfile_flag,'w') as f:
             pass
         with h5py.File(outfile, 'w') as fw:
-            fw.create_dataset('mvec',data=target_momList)
+            fw.create_dataset('moms',data=target_momList)
             fw.create_dataset('inserts',data=gms)
             if 'j.h5_exact' in files and 'j.h5_stoch' in files:
                 for case in ['local','d0','d1','d2','d3']:
@@ -107,7 +107,7 @@ def run(cfg):
                     t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
                     t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
                     
-                    label='' if case in ['local'] else '_'+case
+                    label='' if case in ['local'] else ';'+case
                     fw.create_dataset('data/j+'+label,data=t_p)
                     fw.create_dataset('data/j-'+label,data=t_m)
                 
@@ -185,7 +185,7 @@ def run(cfg):
                     t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
                     t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
                     
-                    label='' if case in ['local'] else '_'+case
+                    label='' if case in ['local'] else ';'+case
                     fw.create_dataset('data/js'+label,data=t_p/2)
                 
             if 'jc.h5_stoch' in files:
@@ -229,7 +229,7 @@ def run(cfg):
                     t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
                     t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
                     
-                    label='' if case in ['local'] else '_'+case
+                    label='' if case in ['local'] else ';'+case
                     fw.create_dataset('data/jc'+label,data=t_p/2)
             
         os.remove(outfile_flag)
