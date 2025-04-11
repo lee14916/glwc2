@@ -38,6 +38,44 @@ def run(cfg):
     os.makedirs(outpath,exist_ok=True)
     files=[file for file in os.listdir(inpath) if file.startswith('N.h5')]
     
+    inpath_fullmom=f'/p/project/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_N_fullmom/{cfg}/'
+    files_fullmom=[file for file in os.listdir(inpath) if file.startswith('N.h5')]
+    outfile=f'{outpath}N.h5'
+    outfile_flag=outfile+'_flag'
+    if (not os.path.isfile(outfile)) or os.path.isfile(outfile_flag):
+        with open(outfile_flag,'w') as f:
+            pass
+        
+        flas=['N_N']
+        data={fla:0 for fla in flas}; data_bw={fla:0 for fla in flas}
+        Nsrc=0
+        flag_setup=True; moms=[]
+        for file in files_fullmom:
+            with h5py.File(f'{inpath_fullmom}{file}') as fN:
+                if flag_setup:
+                    moms=fN[f'moms'][:]
+                    flag_setup=False
+                NsrcCurrent=len(fN['srcs'])
+                Nsrc+=NsrcCurrent
+                
+                for fla in flas:
+                    t=(fN[f'data/N1_N1'][:] + fN[f'data/N2_N2'][:])/2
+                    t=np.mean(t,axis=2) * NsrcCurrent
+                    data[fla] += t
+                    t=(fN[f'data_bw/N1_N1'][:] + fN[f'data_bw/N2_N2'][:])/2
+                    t=np.mean(t,axis=2) * NsrcCurrent
+                    data_bw[fla] += t
+                    
+        with h5py.File(outfile,'w') as fw:
+            tmax=len(data[flas[0]])-1
+            fw.create_dataset('notes',data=['time,mom',f'[time@fwd]=0:{tmax}; [time@bwd]=-{tmax}:-1'])
+            fw.create_dataset('moms',data=moms)
+            for key,val in data.items():
+                fla=key
+                fw.create_dataset(f'data/{fla}',data=data[fla]/Nsrc)    
+                fw.create_dataset(f'data_bw/{fla}',data=data_bw[fla]/Nsrc)    
+        os.remove(outfile_flag)
+    
     with h5py.File(f'{inpath}j.h5') as fj:
         flas=['N_N']
         # js=['j+;id,Dm','js;id,Dm']
