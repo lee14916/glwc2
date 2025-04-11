@@ -1,5 +1,6 @@
-path=/p/arch1/hch02/hch02b/cB211.072.64/twop_threep_dt20_64srcs/
 path_pre=/p/project/ngff/li47/code/projectData/02_discNJN_1D/cB211.072.64/data_pre_N/
+
+path=/p/arch1/hch02/hch02b/cB211.072.64/twop_threep_dt20_64srcs/
 for file in ${path}twop_*.h5
 do
     # file_size=$(stat -c %s "$file")

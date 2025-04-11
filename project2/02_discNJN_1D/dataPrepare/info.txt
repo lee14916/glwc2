@@ -2,32 +2,30 @@ N1=p; N2=n
 d0,d1,d2,d3 = dx,dy,dz,dt
 
 
-
-
 cB
-/p/arch/hch02/hch02b/cB211.072.64/twop_threep_dt20_64srcs/twop_${cfg}.h5: Nsrc~64
-/p/arch/hch02/hch02b/cB211.072.64/twop_threep_2/twop_${cfg}.h5: Nsrc~85
-/p/arch/hch02/hch02k/cB2.072.64_Nf211/twop...: Nsrc~200
+/p/arch1/hch02/hch02b/cB211.072.64/twop_threep_dt20_64srcs/twop_${cfg}.h5: Nsrc~64
+/p/arch1/hch02/hch02b/cB211.072.64/twop_threep_2/twop_${cfg}.h5: Nsrc~85
+/p/arch1/hch02/hch02k/cB2.072.64_Nf211/twop...: Nsrc~200
 total~349
 
 cC
-/p/arch/hch02/hch02b/cC211.60.80/${cfg}/twop_nucl_srcs650.h5: Nsrc~650 ('mvec' is in other files at the same directory)
+/p/arch1/hch02/hch02b/cC211.60.80/${cfg}/twop_nucl_srcs650.h5: Nsrc~650 ('mvec' is in other files at the same directory)
 total~650
 
 cD
 
 ====
-/p/arch/hch02/hch02b/cD211.54.96/nucl_all_source.tar: Nsrc~256
-/p/arch/hch02/hch02b/cD211.54.96/twop_129srcs/${cfg}.h5: Nsrc~129, in nucl_all_source
-/p/arch/hch02/hch02b/cD211.54.96/twop_threep: Nsrc~63, in nucl_all_source
-/p/arch/hch02/hch02b/cD211.54.96/twop_threep_2: Nsrc~64, in nucl_all_source
-/p/arch/hch02/hch02b/cD211.54.96/twop_threep_3: Nsrc~112
+/p/arch1/hch02/hch02b/cD211.54.96/nucl_all_source.tar: Nsrc~256=129+63+64
+/p/arch1/hch02/hch02b/cD211.54.96/twop_129srcs/${cfg}.h5: Nsrc~129, in nucl_all_source
+/p/arch1/hch02/hch02b/cD211.54.96/twop_threep: Nsrc~63, in nucl_all_source
+/p/arch1/hch02/hch02b/cD211.54.96/twop_threep_2: Nsrc~64, in nucl_all_source
+/p/arch1/hch02/hch02b/cD211.54.96/twop_threep_3: Nsrc~112
 total~368
 
 cD // below only valid for 0000_r0
-/p/arch/hch02/hch02b/cD211.54.96/nucl_all_source.tar: Nsrc~256
-/p/arch/hch02/hch02b/cD211.54.96/twop_129srcs/${cfg}.h5: Nsrc~129, in nucl_all_source
-/p/arch/hch02/hch02b/cD211.54.96/twop_threep: Nsrc~63, in nucl_all_source
-/p/arch/hch02/hch02b/cD211.54.96/twop_threep_2: Nsrc~176, 64 in nucl_all_source
-/p/arch/hch02/hch02b/cD211.54.96/twop_threep_3: Nsrc~112 in twop_threep_2
+/p/arch1/hch02/hch02b/cD211.54.96/nucl_all_source.tar: Nsrc~256
+/p/arch1/hch02/hch02b/cD211.54.96/twop_129srcs/${cfg}.h5: Nsrc~129, in nucl_all_source
+/p/arch1/hch02/hch02b/cD211.54.96/twop_threep: Nsrc~63, in nucl_all_source
+/p/arch1/hch02/hch02b/cD211.54.96/twop_threep_2: Nsrc~176, 64 in nucl_all_source
+/p/arch1/hch02/hch02b/cD211.54.96/twop_threep_3: Nsrc~112 in twop_threep_2
 total~432-64~368
