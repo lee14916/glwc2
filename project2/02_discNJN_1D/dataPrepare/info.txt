@@ -9,7 +9,7 @@ cB
 total~349
 
 cC
-/p/arch1/hch02/hch02b/cC211.60.80/${cfg}/twop_nucl_srcs650.h5: Nsrc~650 ('mvec' is in other files at the same directory)
+/p/arch1/hch02/hch02b/cC211.60.80/${cfg}/twop_nucl_srcs650.h5: Nsrc~650 ('mvec' is in other files at the same directory) (length of moms may not be the same within a same file. At least both 2109 and 3071 are found in the first cfg) 
 total~650
 
 cD
