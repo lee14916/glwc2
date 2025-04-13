@@ -8,7 +8,7 @@ ens='cB211.072.64'
 
 lat_L={'cB211.072.64':64,'cC211.060.80':80,'cD211.054.96':96}[ens]
 
-max_mom2=23
+max_mom2={'cB211.072.64':23,'cC211.060.80':26,'cD211.054.96':26}[ens]
 range_xyz=range(-int(np.sqrt(max_mom2))-1,int(np.sqrt(max_mom2))+2)
 moms_pc=[[x,y,z] for x in range_xyz for y in range_xyz for z in range_xyz if x**2+y**2+z**2<=max_mom2]
 max_mom2=1

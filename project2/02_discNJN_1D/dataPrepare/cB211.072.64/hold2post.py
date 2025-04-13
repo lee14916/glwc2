@@ -15,7 +15,7 @@ Nmax_sq=int(np.floor(np.sqrt(Nmax))); t_range=range(-Nmax_sq,Nmax_sq+1)
 moms_N=[[x,y,z] for x in t_range for y in t_range for z in t_range if np.linalg.norm([x,y,z])**2<=Nmax]
 moms_N.sort()
 #
-Nmax=23
+Nmax={'cB211.072.64':23,'cC211.060.80':26,'cD211.054.96':26}[ens]
 Nmax_sq=int(np.floor(np.sqrt(Nmax))); t_range=range(-Nmax_sq,Nmax_sq+1)
 moms_j=[[x,y,z] for x in t_range for y in t_range for z in t_range if np.linalg.norm([x,y,z])**2<=Nmax]
 moms_j.sort()
