@@ -8,6 +8,10 @@ import numpy as np
 ens='cB211.072.64'
 tmax={'cB211.072.64':36,'cC211.060.80':40,'cD211.054.96':48}[ens]
 
+flags={
+    'g5H_local':True,
+}
+
 #=========================================================================================
 
 Nmax=1
@@ -85,7 +89,21 @@ def run(cfg):
                 
                 txyz=['t','x','y','z']; txyz2ind={'t':0,'x':1,'y':2,'z':3}
                 insert2d={'x':'0','y':'1','z':'2','t':'3'}
-                for ind_j,j in enumerate(['j+','js','jc']):
+                for ind_j,j in enumerate(['j+','j-','js','jc']):
+                    case='local'; inserts=gms
+                    if ind_j==0:
+                        fw.create_dataset(f'inserts',data=inserts)
+                    t=fr[f'data/{j}'][:,momMap,:]
+                    if flags['g5H_local']:
+                        sgn={'j+':1,'j-':-1,'js':1,'jc':1}[j]
+                        g5Cj={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':-1,'g5':1,'g5gx':1,'g5gy':1,'g5gz':1,'g5gt':1,'sgmxy':-1,'sgmyz':-1,'sgmzx':-1,'sgmtx':-1,'sgmty':-1,'sgmtz':-1}
+                        sgnConj=np.array([g5Cj[gj] for gj in gms])
+                        momMap_neg=[moms.index(list(-np.array(mom))) for mom in moms_j]
+                        t2=t.copy()
+                        t2=t2[:,momMap_neg]
+                        t=(t+sgn*np.conj(t2)*sgnConj[None,None,:])/2
+                    fw.create_dataset(f'data/{j}',data=t)
+                    
                     case='id,Dm'; inserts=txyz
                     if ind_j==0:
                         fw.create_dataset(f'inserts;{case}',data=inserts)

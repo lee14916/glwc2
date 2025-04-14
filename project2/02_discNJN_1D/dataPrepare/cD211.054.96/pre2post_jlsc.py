@@ -1,6 +1,6 @@
 # cyclone
 '''
-cat data_aux/cfgs_all_j | xargs -I @ -P 10 python3 -u pre2post_j.py -c @ > log/pre2post_j.out & 
+cat data_aux/cfgs_all_jsc | xargs -I @ -P 10 python3 -u pre2post_jlsc.py -c @ > log/pre2post_jlsc.out & 
 '''
 import re, click
 import h5py, os
@@ -12,7 +12,7 @@ MUS=0.0136
 MUC=0.166
 KAPPA=0.137972174
 
-basePath=f'/nvme/h/cy22yl1/projectData/02_discNJN_1D/{ens}/'
+basePath=f'/p/project/ngff/li47/code/projectData/02_discNJN_1D/{ens}/'
 
 cfg2old=lambda cfg: cfg[1:]+'_r'+{'a':'0','b':'1','c':'2','d':'3'}[cfg[0]]
 cfg2new=lambda cfg: {'0':'a','1':'b','2':'c','3':'d'}[cfg[-1]] + cfg[:4]
@@ -51,10 +51,12 @@ gmArray_m_gen=np.array([1j*gamma_5@gmDic[gm] if gm in signlessClass_g5comu else 
 @click.option('-c','--cfg')
 def run(cfg):
     cfg_old=cfg2old(cfg)
-    inpath=f'{basePath}data_pre_j/{cfg_old}/'
+    inpath=f'{basePath}data_pre_jsc/{cfg_old}/'
+    inpathl=f'{basePath}loop_cyclone/{cfg}/'
     outpath=f'{basePath}data_post/{cfg}/'
 
     files=os.listdir(inpath)
+    filesl=os.listdir(inpathl)
     
     os.makedirs(outpath,exist_ok=True)
     outfile=f'{outpath}j.h5'
@@ -65,16 +67,23 @@ def run(cfg):
         with h5py.File(outfile, 'w') as fw:
             fw.create_dataset('moms',data=target_momList)
             fw.create_dataset('inserts',data=gms)
-            if 'j.h5_S1_std' in files and 'j.h5_S1_gen' in files and 'j.h5_S8_std' in files and 'j.h5_S8_gen' in files:
+            if 'j.h5' in filesl:
+                with h5py.File(f'{inpathl}j.h5') as f:
+                    moms=f['moms'][:]
+                    assert(np.all(target_momList==moms))
+                    for ky in f['data'].keys():
+                        fw.create_dataset(f'data/{ky}',data=f['data'][ky][:])
+            
+            if 'js.h5_S1_std' in files and 'js.h5_S1_gen' in files and 'js.h5_S4_std' in files and 'js.h5_S4_gen' in files:
                 for case in ['local','d0','d1','d2','d3']:
                     case2={'local':'local','d0':'dir_00','d1':'dir_01','d2':'dir_02','d3':'dir_03'}[case]
                     case3={'local':'local','d0':'dir0','d1':'dir1','d2':'dir2','d3':'dir3'}[case]
                     
-                    N_S=8
+                    N_S=4
                     Ndivide=512
                     t_std=t_gen=0
                     for i in range(1,N_S+1):
-                        with h5py.File(inpath+'/j.h5_S'+str(i)+'_std') as fs, h5py.File(inpath+'/j.h5_S'+str(i)+'_gen') as fg:
+                        with h5py.File(inpath+'/js.h5_S'+str(i)+'_std') as fs, h5py.File(inpath+'/js.h5_S'+str(i)+'_gen') as fg:
                             ky_cfg='Conf'+cfg_old
                             
                             if case in ['local']:
@@ -99,15 +108,57 @@ def run(cfg):
                     t_std=t_std/N_S; t_gen=t_gen/N_S
                     # print(t_std.shape,t_gen.shape)
                     
-                    t_std=t_std*(-8*1j*MUL*KAPPA**2)
+                    t_std=t_std*(-8*1j*MUS*KAPPA**2)
                     t_gen=t_gen*(-4*KAPPA)
 
                     t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
                     t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
                     
                     label='' if case in ['local'] else ';'+case
-                    fw.create_dataset('data/j+'+label,data=t_p)
-                    fw.create_dataset('data/j-'+label,data=t_m)
+                    fw.create_dataset('data/js'+label,data=t_p/2)
+                    
+            if 'jc.h5_S1_std' in files and 'jc.h5_S1_gen' in files:
+                for case in ['local','d0','d1','d2','d3']:
+                    case2={'local':'local','d0':'dir_00','d1':'dir_01','d2':'dir_02','d3':'dir_03'}[case]
+                    case3={'local':'local','d0':'dir0','d1':'dir1','d2':'dir2','d3':'dir3'}[case]
+                    
+                    N_S=1
+                    Ndivide=512
+                    t_std=t_gen=0
+                    for i in range(1,N_S+1):
+                        with h5py.File(inpath+'/jc.h5_S'+str(i)+'_std') as fs, h5py.File(inpath+'/jc.h5_S'+str(i)+'_gen') as fg:
+                            ky_cfg='Conf'+cfg_old
+                            
+                            if case in ['local']:
+                                moms=fs[ky_cfg]['Ns0']['localLoops']['mvec']
+                            else:
+                                moms=fs[ky_cfg]['Ns0']['oneD'][case3]['mvec']
+                            momDic={}
+                            for i,mom in enumerate(moms):
+                                momDic[tuple(mom)]=i
+                            momMap=[momDic[tuple(mom)] for mom in target_momList]
+                            
+                            if case in ['local']:
+                                t_std += fs[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
+                                t_gen += fg[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
+                            else:
+                                t_std += fs[ky_cfg]['Ns0']['oneD'][case3]['loop'][:]/Ndivide
+                                t_gen += fg[ky_cfg]['Ns0']['oneD'][case3]['loop'][:]/Ndivide
+                            
+                    t_std=t_std[:,:,:,momMap]; t_gen=t_gen[:,:,:,momMap]
+                    t_std=t_std[...,0]+1j*t_std[...,1]; t_gen=t_gen[...,0]+1j*t_gen[...,1]
+                    t_std=np.transpose(t_std,[0,3,1,2]); t_gen=np.transpose(t_gen,[0,3,1,2])
+                    t_std=t_std/N_S; t_gen=t_gen/N_S
+                    # print(t_std.shape,t_gen.shape)
+                    
+                    t_std=t_std*(-8*1j*MUC*KAPPA**2)
+                    t_gen=t_gen*(-4*KAPPA)
+
+                    t_p=np.einsum('gab,tmab->tmg',gmArray_p_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_p_gen,t_gen)
+                    t_m=np.einsum('gab,tmab->tmg',gmArray_m_std,t_std)+np.einsum('gab,tmab->tmg',gmArray_m_gen,t_gen)
+                    
+                    label='' if case in ['local'] else ';'+case
+                    fw.create_dataset('data/jc'+label,data=t_p/2)
             
         os.remove(outfile_flag)
     print('flag_cfg_done: '+cfg)
