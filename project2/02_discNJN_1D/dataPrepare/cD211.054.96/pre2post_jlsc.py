@@ -1,6 +1,6 @@
 # cyclone
 '''
-cat data_aux/cfgs_all_jsc | xargs -I @ -P 10 python3 -u pre2post_jlsc.py -c @ > log/pre2post_jlsc.out & 
+cat data_aux/cfgs_all_j | xargs -I @ -P 10 python3 -u pre2post_jlsc.py -c @ > log/pre2post_jlsc.out & 
 '''
 import re, click
 import h5py, os
@@ -55,6 +55,8 @@ def run(cfg):
     inpathl=f'{basePath}loop_cyclone/{cfg}/'
     outpath=f'{basePath}data_post/{cfg}/'
 
+    os.makedirs(inpath,exist_ok=True)
+    os.makedirs(inpathl,exist_ok=True)
     files=os.listdir(inpath)
     filesl=os.listdir(inpathl)
     

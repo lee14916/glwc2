@@ -4,7 +4,7 @@ cat data_aux/cfgs_run | xargs -n 1 -I @ -P 10 python3 -u post2avgsrc.py -c @ > l
 import h5py,os,re,click
 import numpy as np
 
-ens='cC211.060.80'
+ens='cD211.054.96'
 
 lat_L={'cB211.072.64':64,'cC211.060.80':80,'cD211.054.96':96}[ens]
 

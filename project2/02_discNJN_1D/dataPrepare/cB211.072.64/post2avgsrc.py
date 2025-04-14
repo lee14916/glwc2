@@ -79,7 +79,8 @@ def run(cfg):
     with h5py.File(f'{inpath}j.h5') as fj:
         flas=['N_N']
         # js=['j+;id,Dm','js;id,Dm']
-        js=list(fj['data'].keys())
+        js=[j for j in fj['data'].keys() if not j.startswith('j-') and ';' in j]
+        # js+=['j+','j-','js','jc']
         js.sort()
         for j in js:
             outfile=f'{outpath}discNJN_{j}.h5'
@@ -142,8 +143,11 @@ def run(cfg):
                 with h5py.File(outfile,'w') as fw:
                     fw.create_dataset('notes',data=['time,mom,proj,insert','mom=[sink,ins]; sink+ins=src','proj=[P0,Px,Py,Pz]'])
                     fw.create_dataset('moms',data=moms_target)
-                    t=j.split(';')[1:]; t=';'.join(t)
-                    ky=f'inserts;{t}'
+                    if ';' in j:
+                        t=j.split(';')[1:]; t=';'.join(t)
+                        ky=f'inserts;{t}'
+                    else:
+                        ky='inserts'
                     fw.create_dataset(ky,data=fj[ky][:])
                     for key in data:
                         fla,tf,j=key
