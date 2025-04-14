@@ -1,6 +1,6 @@
 # cyclone
 '''
-cat data_aux/cfgs_all_j | xargs -I @ -P 10 python3 -u pre2post_j.py -c @ > log/pre2post_j.out & 
+cat data_aux/cfgs_all_jl | xargs -I @ -P 10 python3 -u pre2post_jl.py -c @ > log/pre2post_jl.out & 
 '''
 import re, click
 import h5py, os
@@ -51,7 +51,7 @@ gmArray_m_gen=np.array([1j*gamma_5@gmDic[gm] if gm in signlessClass_g5comu else 
 @click.option('-c','--cfg')
 def run(cfg):
     cfg_old=cfg2old(cfg)
-    inpath=f'{basePath}data_pre_j/{cfg_old}/'
+    inpath=f'{basePath}data_pre_jl/{cfg_old}/'
     outpath=f'{basePath}data_post/{cfg}/'
 
     files=os.listdir(inpath)

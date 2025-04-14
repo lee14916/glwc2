@@ -1,5 +1,5 @@
 # cyclone
-path_pre=/nvme/h/cy22yl1/projectData/02_discNJN_1D/cD211.054.96/data_pre_j/
+path_pre=/nvme/h/cy22yl1/projectData/02_discNJN_1D/cD211.054.96/data_pre_jl/
 
 for ind in {1..8}
 do
