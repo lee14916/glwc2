@@ -3,10 +3,10 @@ import numpy as np
 import pickle, os
 from scipy.sparse import csr_matrix
 
-pathBase='/capstor/store/cscs/userlab/s1174/lyan/code/projectData/Nsgm/cB211.072.64_base/'
+pathBase='/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/01_Nsgm/cB211.072.64_base/'
 temp=os.getcwd().split('/')[-1]
-pathBaseTf=f'/capstor/store/cscs/userlab/s1174/lyan/code/projectData/Nsgm/{temp}/'
-pathBaseCode='/capstor/store/cscs/userlab/s1174/lyan/code/glwc2/project2/Nsgm/dataPrepare/cB211.072.64_base/'
+pathBaseTf=f'/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/01_Nsgm/{temp}/'
+pathBaseCode='/capstor/store/cscs/userlab/s1174/lyan/code/glwc2/project2/01_Nsgm/dataPrepare/cB211.072.64_base/'
 os.makedirs(pathBase,exist_ok=True)
 os.makedirs(pathBaseTf,exist_ok=True)
 

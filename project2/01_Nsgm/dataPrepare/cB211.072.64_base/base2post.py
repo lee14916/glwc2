@@ -1,5 +1,5 @@
 '''
-cat data_aux/cfgs_run | xargs -n 1 -I @ -P 10 python3 -u base2post.py -c @ > log/base2post.out &
+cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u base2post.py -c @ > log/base2post.out &
 '''
 import os, click, h5py, re, pickle
 import numpy as np
