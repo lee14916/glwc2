@@ -34,7 +34,7 @@ def get_phase(src_int,mom):
 @click.option('-c','--cfg')
 def run(cfg):
     inpath=f'/p/project/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_post/{cfg}/'
-    outpath=f'/p/project/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_avgsrc/{cfg}/'
+    outpath=f'/p/project/ngff/li47/code/scratch/run/02_discNJN_1D/{ens}/data_avgsrc/{cfg}/'
     os.makedirs(outpath,exist_ok=True)
     files=[file for file in os.listdir(inpath) if file.startswith('N.h5')]
     
@@ -78,10 +78,9 @@ def run(cfg):
     
     with h5py.File(f'{inpath}j.h5') as fj:
         flas=['N_N']
-        # js=['j+;id,Dm','js;id,Dm']
-        js=[j for j in fj['data'].keys() if not j.startswith('j-') and ';' in j]
-        # js+=['j+','j-','js','jc']
-        js.sort()
+        # js=['j+','j-','js','jc']
+        # js=[j for j in fj['data'].keys() if not j.startswith('j-') and ';' in j]
+        js=['j+;g{m,Dn};tl','js;g{m,Dn};tl','jc;g{m,Dn};tl']
         for j in js:
             outfile=f'{outpath}discNJN_{j}.h5'
             outfile_flag=outfile+'_flag'
