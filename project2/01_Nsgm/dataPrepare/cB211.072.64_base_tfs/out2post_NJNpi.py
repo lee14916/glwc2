@@ -1,6 +1,6 @@
 
 '''
-cat data_aux/cfgs_run | xargs -n 1 -I @ -P 10 python3 -u out2post_NJNpi.py -c @ > log/out2post_NJNpi.out & 
+cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u out2post_NJNpi.py -c @ > log/out2post_NJNpi.out & 
 '''
 import os, click, h5py, re, pickle
 import numpy as np
@@ -8,7 +8,8 @@ import auxx as aux
 
 postcode='NJNpi-Nsrc=4*1'
 def cfg2out(cfg):
-    path = f'/capstor/store/cscs/userlab/s1174/lyan/code/temp/{cfg}/'
+    t='' if cfg[0]=='a' else '_b'
+    path = f'/capstor/store/cscs/userlab/s1174/fpittler/runs/njnsigma_physical_point_64{t}/{cfg[1:]}/'
     return path 
 
 flags={
@@ -292,8 +293,8 @@ def run(cfg):
                                 pi2s=list(fr[src]['12'].keys())
                                 
                                 conts=list(set([cont.split('_deltat_')[0] for cont in fr[src]['12'][pi2s[0]] if cont!='mvec']))
-                                tfs=list(set([int(cont.split('_deltat_')[1]) for cont in fr[src]['12'][pi2s[0]] if cont!='mvec']))
-                                tfs=[8]
+                                # tfs=list(set([int(cont.split('_deltat_')[1]) for cont in fr[src]['12'][pi2s[0]] if cont!='mvec']))
+                                tfs=aux.tfList
                                 
                                 contDic={}
                                 for i,cont in enumerate(conts):
