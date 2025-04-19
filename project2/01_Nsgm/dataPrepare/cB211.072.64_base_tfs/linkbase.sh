@@ -1,4 +1,8 @@
-tfs=8
+for line in `cat data_aux/tfs`
+do
+    tfs=${line}
+    break
+done
 
 for cfg in `cat ../cB211.072.64_base/data_aux/cfgs_run`
 do

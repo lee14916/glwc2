@@ -1,0 +1,1 @@
+find ${SCRATCH} -type f -exec touch {} +

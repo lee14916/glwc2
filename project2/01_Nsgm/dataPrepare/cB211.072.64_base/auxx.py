@@ -10,10 +10,10 @@ pathBaseCode='/capstor/store/cscs/userlab/s1174/lyan/code/glwc2/project2/01_Nsgm
 os.makedirs(pathBase,exist_ok=True)
 os.makedirs(pathBaseTf,exist_ok=True)
 
-def cfg2post(cfg,case):
-    file={'pi0f':'pi0f.h5_Nstoc25','P':'P.h5_jPP-f-Nsigma',
-            'j':'j.h5_loops-b-2D8','jPi':'jPi.h5_jPP-f-Nsigma'}[case]
-    return 'data_post/'+cfg+'/'+file
+# def cfg2post(cfg,case):
+#     file={'pi0f':'pi0f.h5_Nstoc25','P':'P.h5_jPP-f-Nsigma',
+#             'j':'j.h5_loops-b-2D8','jPi':'jPi.h5_jPP-f-Nsigma'}[case]
+#     return 'data_post/'+cfg+'/'+file
 
 tfList=[]
 gjList=['id','gx','gy','gz','gt','g5','g5gx','g5gy','g5gz','g5gt','sgmyz','sgmzx','sgmxy','sgmtx','sgmty','sgmtz']
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     
     '''
     
-    os.makedirs(pathBase+'log', exist_ok=True)
+    os.makedirs('log', exist_ok=True)
     os.makedirs(pathBase+'data_aux', exist_ok=True)
     
     with open(path_diags_all,'w') as f:
