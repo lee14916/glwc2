@@ -98,8 +98,9 @@ def run(cfg):
                         sgn={'j+':1,'j-':-1,'js':1,'jc':1}[j]
                         g5Cj={'id':1,'gx':-1,'gy':-1,'gz':-1,'gt':-1,'g5':1,'g5gx':1,'g5gy':1,'g5gz':1,'g5gt':1,'sgmxy':-1,'sgmyz':-1,'sgmzx':-1,'sgmtx':-1,'sgmty':-1,'sgmtz':-1}
                         sgnConj=np.array([g5Cj[gj] for gj in gms])
-                        momMap_neg=[moms.index(list(-np.array(mom))) for mom in moms_j]
-                        t2=fr[f'data/{j}'][:,momMap_neg]
+                        momMap_neg=np.array([moms.index(list(-np.array(mom))) for mom in moms_j])
+                        t2=fr[f'data/{j}'][:,:]
+                        t2=t2[:,momMap_neg]
                         t=(t+sgn*np.conj(t2)*sgnConj[None,None,:])/2
                     fw.create_dataset(f'data/{j}',data=t)
                     

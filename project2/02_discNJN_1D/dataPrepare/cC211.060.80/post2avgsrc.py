@@ -1,5 +1,5 @@
 '''
-cat data_aux/cfgs_run | xargs -n 1 -I @ -P 10 python3 -u post2avgsrc.py -c @ > log/post2avgsrc.out & 
+cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u post2avgsrc.py -c @ > log/post2avgsrc.out & 
 '''
 import h5py,os,re,click
 import numpy as np
