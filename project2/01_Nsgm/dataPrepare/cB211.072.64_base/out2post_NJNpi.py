@@ -8,8 +8,8 @@ import auxx as aux
 
 postcode='NJNpi-Nsrc=4*1'
 def cfg2out(cfg):
-    assert(cfg[0]=='a')
-    path = f'/capstor/store/cscs/userlab/s1174/fpittler/runs/njnsigma_physical_point_64/{cfg[1:]}/'
+    t='' if cfg[0]=='a' else '_b'
+    path = f'/capstor/store/cscs/userlab/s1174/fpittler/runs/njnsigma_physical_point_64{t}/{cfg[1:]}/'
     return path 
 
 flags={

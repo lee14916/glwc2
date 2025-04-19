@@ -10,6 +10,8 @@ postcode='NJN-Nsrc=1'
 def cfg2out(cfg):
     t='' if cfg[0]=='a' else '_b'
     path = f'/capstor/store/cscs/userlab/s1174/fpittler/runs/njn_physical_point_64{t}/{cfg[1:]}/'
+    if cfg[0]=='b':
+        path=f'/capstor/scratch/cscs/fpittler/run/run_64_NJN_b/'
     return path 
 
 flags={
@@ -32,6 +34,7 @@ def run(cfg):
     inpath=cfg2out(cfg)
     outpath=aux.pathBaseTf+'data_post/'+cfg+'/'
     files = os.listdir(inpath)
+    files=[file for file in files if cfg[1:] in file]
     os.makedirs(outpath,exist_ok=True)
 
     # outfile=outpath+'N.h5_'+postcode; outfile_bw=outpath+'N_bw.h5_'+postcode

@@ -1,5 +1,5 @@
 '''
-rm -r data_merge/temp*
+rm -r /capstor/store/cscs/userlab/s1174/lyan/code/projectData2/01_Nsgm/cB211.072.64_base_8,10,12,14,16,18,20/data_merge/temp*
 cat data_aux/diags_all | xargs -I @ -P 10 python3 -u avg2merge.py -d @ > log/avg2merge.out & 
 cat data_aux/diags_main | xargs -I @ -P 10 python3 -u avg2merge.py -d @ > log/avg2merge.out & 
 '''
