@@ -1,5 +1,5 @@
-0, cfgs_run for cB211.072.64_run, cB211.072.64_base, cB211.072.64_base_tfs
-1, all in cB211.072.64_run
+0, cfgs_run (from general.ipynb) for cB211.072.64_base, cB211.072.64_base_tfs
+1, run2out in 64_base
 2, all in cB211.072.64_base except merge
 3, all in cB211.072.64_base_tfs
 4, merge in cB211.072.64_base

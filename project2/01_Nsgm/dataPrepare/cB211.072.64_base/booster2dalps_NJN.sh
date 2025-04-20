@@ -1,0 +1,1 @@
+rsync -av --progress /nvme/h/cy22yl1/projectData2/01_Nsgm/cB211.072.64_base/data_out_NJN/ li47@juwels-booster.fz-juelich.de:/p/project/ngff/li47/code/projectData/02_discNJN_1D/cB211.072.64/loop_cyclone/
