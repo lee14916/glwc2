@@ -6,6 +6,7 @@ from scipy.sparse import csr_matrix
 with open('data_aux/tfs','r') as f:
     tfs=f.read().splitlines()[0]
     tfList=[int(tf) for tf in tfs.split(',')]
+tfList_disc=range(2,30+1)
 
 pathBase='/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/01_Nsgm/cB211.072.64_base/'
 temp=os.getcwd().split('/')[-1]

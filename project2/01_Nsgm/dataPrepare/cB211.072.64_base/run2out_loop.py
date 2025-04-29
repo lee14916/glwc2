@@ -1,5 +1,5 @@
 '''
-cat runAux/cfgs_run | xargs -I @ -P 10 python3 -u run2out_loop.py -c @ > log/run2out_loop.out & 
+cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u run2out_loop.py -c @ > log/run2out_loop.out & 
 '''
 import os, click, h5py, re, pickle
 import numpy as np

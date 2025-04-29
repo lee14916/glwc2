@@ -214,7 +214,7 @@ def run(cfg):
                 opabsMap,sgns_opab=PTrans(data[diag]['opabs'])
                 data[diag][dataset]=(data[diag][dataset]+sgn*data[diag][dataset_new][:,opabsMap]*sgns_opab[None,:])/2
             else:
-                sgn*={'j+':1,'j-':-1}[j]
+                sgn*={'j+':1,'j-':-1,'js':1,'jc':1}[j]
                 fla_new='_'.join([flaa_new,j,flab_new,dt,tf])
                 dataset_new='/'.join([data_str,fla_new])
                 if dataset_new not in data[diag].keys():

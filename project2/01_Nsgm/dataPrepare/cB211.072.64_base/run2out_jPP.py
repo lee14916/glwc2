@@ -1,6 +1,6 @@
 
 '''
-cat runAux/cfgs_run | xargs -I @ -P 10 python3 -u run2out_jPP.py -c @ > log/run2out_jPP.out & 
+cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u run2out_jPP.py -c @ > log/run2out_jPP.out & 
 '''
 import os, click, h5py, re, pickle
 import numpy as np
