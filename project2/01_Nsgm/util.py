@@ -58,12 +58,12 @@ def jackknife(dat,d:int=0,nmin:int=6000):
 def jackme(dat_jk):
     n=len(dat_jk)
     dat_mean=np.mean(dat_jk,axis=0)
-    dat_err=np.sqrt(np.var(dat_jk,axis=0)*(n-1))
+    dat_err=np.sqrt(np.var(dat_jk,axis=0,ddof=0)*(n-1))
     return (dat_mean,dat_err)
 def jackmec(dat_jk):
     n=len(dat_jk)
     dat_mean=np.mean(dat_jk,axis=0)
-    dat_cov=np.atleast_2d(np.cov(np.array(dat_jk).T)*(n-1)*(n-1)/n)
+    dat_cov=np.atleast_2d(np.cov(np.array(dat_jk).T,ddof=0)*(n-1))
     dat_err=np.sqrt(np.diag(dat_cov))
     return (dat_mean,dat_err,dat_cov)
 def jackmap(func,dat_jk):
@@ -160,8 +160,8 @@ def jackknife2(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:in
     # print(np.mean(func()))
     # print(np.sqrt(np.var(Tn1)*n))
     TnBar=np.mean(Tn1,axis=0)
-    (tMean,tCov)=(TnBar, np.atleast_2d(np.cov(Tn1.T)*(n-1)*(n-1)/n))
-    # Tn=func(dat); (mean,cov)=(n*Tn-(n-1)*TnBar, np.atleast_2d(np.cov(Tn1.T)*(n-1)*(n-1)/n)) # bias improvement (not suitable for fit)
+    (tMean,tCov)=(TnBar, np.atleast_2d(np.cov(Tn1.T,ddof=0)*(n-1)))
+    # Tn=func(dat); (mean,cov)=(n*Tn-(n-1)*TnBar, np.atleast_2d(np.cov(Tn1.T,ddof)*(n-1))) # bias improvement (not suitable for fit)
     tErr=np.sqrt(np.diag(tCov))
     
     # reformat

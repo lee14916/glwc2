@@ -181,11 +181,12 @@ def run(cfg):
                         t_base=t_base[:,flaMap]*t_app[:,:,:,:,None,None]
                 #===================
                 if 'j' in apps:
-                    js=['j+','j-']
+                    js=['j+','j-','js','jc']
                     flas_new=[]; flaMap=[]; fla2appky={}
                     for ind_fla,fla in enumerate(flas):
-                        for tf in aux.tfList:
-                            for j in js:
+                        for j in js:
+                            tfs=aux.tfList_disc if j in ['js','jc'] else aux.tfList
+                            for tf in tfs:
                                 a,b=fla.split('_')
                                 fla_new='_'.join([a,j,b,'deltat',str(tf)])
                                 flas_new.append(fla_new); 
