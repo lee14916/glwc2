@@ -5,8 +5,8 @@ import os, click, h5py, re, pickle
 import numpy as np
 
 postcode='0mom'
-runPath='/capstor/store/cscs/userlab/s1174/lyan/code/scratch/run/03_NpiScatteringWilson/A15/'
-basePath='/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/03_NpiScatteringWilson/A15/'
+runPath='/capstor/store/cscs/userlab/s1174/lyan/code/scratch/run/03_NpiScatteringWilson/A15_newQuda/'
+basePath='/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/03_NpiScatteringWilson/A15_newQuda/'
 
 lat_L,lat_T=48,48
 
@@ -19,7 +19,7 @@ def key2mom(mom_key):
 @click.command()
 @click.option('-c','--cfg')
 def run(cfg):
-    inpath=f'{runPath}run/{cfg}/'
+    inpath=f'{runPath}run_pion2pt/{cfg}/'
     outpath=f'{basePath}data_post/{cfg}/'
     os.makedirs(outpath,exist_ok=True)
     

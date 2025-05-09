@@ -80,7 +80,7 @@ def jackknife_pseudo(mean,cov,n):
     B=mean-A*mean1
     dat_jk=A[None,:]*dat_jk+B[None,:]
     return dat_jk
-def jackfit(fitfunc,y_jk,pars0,mask=None):
+def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None):
     y_mean,_,y_cov=jackmec(y_jk)
     if mask is not None:
         if mask == 'uncorrelated':
@@ -89,19 +89,25 @@ def jackfit(fitfunc,y_jk,pars0,mask=None):
             y_cov=y_cov*mask
         
     cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True)) # y_cov^{-1}=cho_L_Inv^T@cho_L_Inv
-    fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
+    if parsExtra_jk is None:
+        fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
+    else:
+        parsExtra_mean=list(np.mean(parsExtra_jk,axis=0))
+        fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean)
     pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True)[:2]
     
     if flag_fast == "FastFit": # Generate pseudo jackknife resamples from the single fit rather than doing lots of fits
         n=len(y_jk)
         pars_jk=jackknife_pseudo(pars_mean,pars_cov,n)
     else:
-        def func(dat):
-            fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
-            pars=leastsq(fitfunc_wrapper2,pars_mean)[0]
-            return pars
-        pars_jk=jackmap(func,y_jk)
-    
+        if parsExtra_jk is None:
+            def func(dat):
+                fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
+                pars=leastsq(fitfunc_wrapper2,pars_mean)[0]
+                return pars
+            pars_jk=jackmap(func,y_jk)
+        else:
+            pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
     chi2_jk=np.array([[np.sum(fitfunc_wrapper(pars)**2)] for pars in pars_jk])
     Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
     return pars_jk,chi2_jk,Ndof
