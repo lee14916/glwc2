@@ -5,8 +5,8 @@ import os, click, h5py, re, pickle
 import numpy as np
 
 postcode='0mom'
-runPath='/capstor/store/cscs/userlab/s1174/lyan/code/scratch/run/03_NpiScatteringWilson/A15_newQuda/'
-basePath='/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/03_NpiScatteringWilson/A15_newQuda/'
+runPath='/capstor/store/cscs/userlab/s1174/lyan/code/scratch/run/03_NpiScatteringWilson/A15/'
+basePath='/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/03_NpiScatteringWilson/A15/'
 
 lat_L,lat_T=48,48
 

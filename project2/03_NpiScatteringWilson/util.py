@@ -18,7 +18,7 @@ def fsolve2(func,x0):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         res=fsolve(func, x0)[0]
-    return res if res!=x0 else np.NaN
+    return res if res!=x0 else np.nan
 
 def propagateError(func,mean,cov):
     '''
