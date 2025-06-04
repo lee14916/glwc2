@@ -1,5 +1,5 @@
 '''
-nohup python3 -u mergeDiags.py > log/mergeDiags.out & 
+nohup python3 -u merge.py > log/merge.out & 
 '''
 import os, click, h5py, re
 import numpy as np

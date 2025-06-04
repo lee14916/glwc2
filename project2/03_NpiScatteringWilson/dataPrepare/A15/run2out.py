@@ -90,12 +90,12 @@ def run(cfg):
                     (sx,sy,sz,st)=re.search('sx([0-9]*)sy([0-9]*)sz([0-9]*)st([0-9]*)',file).groups()
                     (sx,sy,sz,st)=(int(sx),int(sy),int(sz),int(st))
                     src_new='sx{:03d}sy{:03d}sz{:03d}st{:03d}'.format(sx,sy,sz,st)
-                    Nstoc=len([stoc for stoc in f[f'{src}/V2B_1'].keys() if stoc.startswith('i_stoc=')])
+                    Nstoc=len([stoc for stoc in f[f'{src}/V2B_2'].keys() if stoc.startswith('i_stoc=')])
                     
-                    pi2s_key=[pi2 for pi2 in f[f'{src}/V3B_1'].keys() if pi2.startswith('pi2=')]; pi2s_key.sort()
+                    pi2s_key=[pi2 for pi2 in f[f'{src}/V3B_2'].keys() if pi2.startswith('pi2=')]; pi2s_key.sort()
                     pi2s=[key2mom(pi2) for pi2 in pi2s_key]
-                    pf1s=[list(mom) for mom in np.atleast_2d(f[f'{src}/V2B_1/mvec'])]
-                    pf2s=[list(mom) for mom in np.atleast_2d(f[f'{src}/V3B_1/mvec'])]
+                    pf1s=[list(mom) for mom in np.atleast_2d(f[f'{src}/V2B_2/mvec'])]
+                    pf2s=[list(mom) for mom in np.atleast_2d(f[f'{src}/V3B_2/mvec'])]
                     
                     pi2Map=[pi2s.index(mom[:3]) for mom in moms_target]
                     pf1Map=[pf1s.index(mom[3:6]) for mom in moms_target]
@@ -116,8 +116,8 @@ def run(cfg):
                     fw.create_dataset('moms',data=moms_target)
                     
                     conts=[
-                        'B114_1','B122_1','B132_1','B214_1','B232_1',
-                        #    'B114_2','B122_2','B132_2','B214_2','B232_2',
+                        # 'B114_1','B122_1','B132_1','B214_1','B232_1',
+                           'B114_2','B122_2','B132_2','B214_2','B232_2',
                            'Z114_1','Z122_1','Z132_1','Z214_1','Z222_1'
                            ]
                     for cont in conts:
@@ -140,8 +140,9 @@ def run(cfg):
                         t=t[:,:,a2ab_map,b2ab_map]
                         fw.create_dataset(f'data/{src_new}/{kyV3V24}',data=t.astype('complex64'))
                         
-                    conts=['W1141_1','W1142_1','W1221_1','W1222_1','W1321_1','W1322_1','W2321_1','W2142_1','W2322_1',
-                        #    'W1141_2','W1142_2','W1221_2','W1222_2','W1321_2','W1322_2','W2321_2','W2142_2','W2322_2'
+                    conts=[
+                        # 'W1141_1','W1142_1','W1221_1','W1222_1','W1321_1','W1322_1','W2321_1','W2142_1','W2322_1',
+                           'W1141_2','W1142_2','W1221_2','W1222_2','W1321_2','W1322_2','W2321_2','W2142_2','W2322_2'
                            ]
                     for cont in conts:
                         topo=cont[0]; tp=cont[1:3]; V24=cont[3]; md=cont[-1]
