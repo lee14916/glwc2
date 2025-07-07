@@ -4,7 +4,7 @@ cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u out2post.py -c @ > log/out2p
 import os, click, h5py, re, pickle
 import numpy as np
 
-postcode='0mom'
+postcode='0mom_3th_1000'
 runPath='/capstor/store/cscs/userlab/s1174/lyan/code/scratch/run/03_NpiScatteringWilson/A15/'
 basePath='/capstor/store/cscs/userlab/s1174/lyan/code/projectData2/03_NpiScatteringWilson/A15/'
 
