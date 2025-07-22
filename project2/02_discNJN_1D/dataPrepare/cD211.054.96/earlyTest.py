@@ -4,7 +4,7 @@ nohup python3 -u earlyTest.py > log/earlyTest.out &
 import h5py,os,re,click
 import numpy as np
 
-ens='cB211.072.64'
+ens='cD211.054.96'
 inpath=f'/p/project/ngff/li47/code/scratch/run/02_discNJN_1D/{ens}/data_avgsrc/'
 inpath_loop=f'/p/project/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_post/'
 outpath=f'/p/project/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_earlytest/test.h5'

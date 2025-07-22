@@ -34,7 +34,7 @@ def propagateError(func,mean,cov):
     AT=np.array(AT)
     A=AT.T
     y_cov=A@cov@AT
-    return (np.array(y_mean),y_cov)
+    return (np.array(y_mean),np.sqrt(np.diag(y_cov)),y_cov)
 
 def jackknife(dat,d:int=0,nmin:int=6000):
     n=len(dat)
