@@ -1,6 +1,6 @@
 # cyclone
 '''
-cat data_aux/cfgs_all_js | xargs -I @ -P 10 python3 -u pre2post_js.py -c @ > log/pre2post_js.out & 
+cat data_aux/cfgs_js | xargs -I @ -P 10 python3 -u pre2post_js.py -c @ > log/pre2post_js.out & 
 '''
 import re, click
 import h5py, os
@@ -51,7 +51,6 @@ gmArray_m_gen=np.array([1j*gamma_5@gmDic[gm] if gm in signlessClass_g5comu else 
 @click.option('-c','--cfg')
 def run(cfg):
     cfg_old=cfg2old(cfg)
-    inpath=f'/p/arch1/hch02/iona1/E112/strange_loops/src1/{cfg_old}'
     inpath=f'{basePath}data_pre_j/{cfg_old}/'
     outpath=f'{basePath}data_post/{cfg}/'
 
@@ -68,33 +67,35 @@ def run(cfg):
             fw.create_dataset('moms',data=target_momList)
             fw.create_dataset('inserts',data=gms)
             
-            if 'js.h5_S1_std' in files and 'js.h5_S1_gen' in files and 'js.h5_S1_std' in files and 'js.h5_S1_gen' in files:
+            if 'js.h5_S1_std' in files and 'js.h5_S1_gen' in files and 'js.h5_S2_std' in files and 'js.h5_S2_gen' in files:
                 for case in ['local','d0','d1','d2','d3']:
                     case2={'local':'local','d0':'dir_00','d1':'dir_01','d2':'dir_02','d3':'dir_03'}[case]
                     case3={'local':'local','d0':'dir0','d1':'dir1','d2':'dir2','d3':'dir3'}[case]
                     
-                    N_S=1
+                    N_S=2
                     Ndivide=512
                     t_std=t_gen=0
                     for i in range(1,N_S+1):
                         with h5py.File(inpath+'/js.h5_S'+str(i)+'_std') as fs, h5py.File(inpath+'/js.h5_S'+str(i)+'_gen') as fg:
                             ky_cfg='Conf'+cfg_old
+                            if 'Ns0' in fs[ky_cfg].keys():
+                                ky_cfg+='/Ns0'
                             
                             if case in ['local']:
-                                moms=fs[ky_cfg]['Ns0']['localLoops']['mvec']
+                                moms=fs[ky_cfg]['localLoops']['mvec']
                             else:
-                                moms=fs[ky_cfg]['Ns0']['oneD'][case3]['mvec']
+                                moms=fs[ky_cfg]['oneD'][case3]['mvec']
                             momDic={}
                             for i,mom in enumerate(moms):
                                 momDic[tuple(mom)]=i
                             momMap=[momDic[tuple(mom)] for mom in target_momList]
                             
                             if case in ['local']:
-                                t_std += fs[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
-                                t_gen += fg[ky_cfg]['Ns0']['localLoops']['loop'][:]/Ndivide
+                                t_std += fs[ky_cfg]['localLoops']['loop'][:]/Ndivide
+                                t_gen += fg[ky_cfg]['localLoops']['loop'][:]/Ndivide
                             else:
-                                t_std += fs[ky_cfg]['Ns0']['oneD'][case3]['loop'][:]/Ndivide
-                                t_gen += fg[ky_cfg]['Ns0']['oneD'][case3]['loop'][:]/Ndivide
+                                t_std += fs[ky_cfg]['oneD'][case3]['loop'][:]/Ndivide
+                                t_gen += fg[ky_cfg]['oneD'][case3]['loop'][:]/Ndivide
                             
                     t_std=t_std[:,:,:,momMap]; t_gen=t_gen[:,:,:,momMap]
                     t_std=t_std[...,0]+1j*t_std[...,1]; t_gen=t_gen[...,0]+1j*t_gen[...,1]
