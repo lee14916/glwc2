@@ -83,7 +83,7 @@ def jackknife_pseudo(mean,cov,n):
 def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None):
     y_mean,_,y_cov=jackmec(y_jk)
     if mask is not None:
-        if mask == 'uncorrelated':
+        if type(mask)==str and mask == 'uncorrelated':
             y_cov=np.diag(np.diag(y_cov))
         else:
             y_cov=y_cov*mask

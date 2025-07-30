@@ -1,0 +1,1 @@
+rsync -av --progress /capstor/store/cscs/userlab/s1174/migrated_project_16_01_2025/fpittler/strange_loops_E112/ li47@juwels-booster.fz-juelich.de:/p/project/ngff/li47/code/projectData/02_discNJN_1D/cE211.044.112/js_dalps/
