@@ -9,15 +9,15 @@ from scipy.linalg import solve_triangular,cholesky
 from inspect import signature
  
 slName='temp'
-os.makedirs('aux/sl',exist_ok=True)
-if os.path.exists('aux/sl/temp'):
-    os.remove('aux/sl/temp')
+os.makedirs('auxx/sl',exist_ok=True)
+if os.path.exists('auxx/sl/temp'):
+    os.remove('auxx/sl/temp')
 sldata={}
 def sl(key,val="sl_load",flagSave=False):
     if key is None:
         return val
     global sldata
-    file='aux/sl/'+slName
+    file='auxx/sl/'+slName
     file_backup=file+'_backup'
     if os.path.isfile(file_backup):
         os.replace(file_backup,file)
@@ -39,8 +39,8 @@ def sl(key,val="sl_load",flagSave=False):
 def sl_reset():
     global sldata
     sldata={}
-    if os.path.exists('aux/sl/temp'):
-        os.remove('aux/sl/temp')
+    if os.path.exists('auxx/sl/temp'):
+        os.remove('auxx/sl/temp')
          
 flag_fast=False
 
@@ -549,7 +549,7 @@ def needsVEV(opa,opb,insert):
         return False
     return True
 
-path='aux/group_coeffs.pkl'
+path='auxx/group_coeffs.pkl'
 with open(path,'rb') as f:
     coeff=pickle.load(f)
     

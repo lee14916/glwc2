@@ -75,7 +75,7 @@ def jackknife_pseudo(mean,cov,n):
 def jackfit(fitfunc,y_jk,pars0,estimator=lambda x:[],mask=None):
     y_mean,_,y_cov=jackmec(y_jk)
     if mask is not None:
-        if mask is 'uncorrelated':
+        if mask=='uncorrelated':
             y_cov=np.diag(np.diag(y_cov))
         else:
             y_cov=y_cov*mask
@@ -399,7 +399,7 @@ def needsVEV(opa,opb,insert):
         return False
     return True
 
-path='aux/group_coeffs.pkl'
+path='auxx/group_coeffs.pkl'
 with open(path,'rb') as f:
     coeff=pickle.load(f)
     
