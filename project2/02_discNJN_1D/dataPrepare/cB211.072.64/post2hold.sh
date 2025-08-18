@@ -1,4 +1,4 @@
-base=/p/project/ngff/li47/code/projectData/02_discNJN_1D/cB211.072.64
+base=/p/project1/ngff/li47/code/projectData/02_discNJN_1D/cB211.072.64
 out=${base}/data_post_hold
 
 # in=${base}/data_post_N

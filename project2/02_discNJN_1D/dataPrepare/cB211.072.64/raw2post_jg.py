@@ -9,10 +9,12 @@ import numpy as np
 import timeit
 
 ens='cB211.072.64'
-beta=1.778
 stouts=range(40+1)
 basePath='/onyx/qdata/gspanoudes/Local_operators/Matrix_elements/cB64/data/gluon_loops_stout4D/'
 replicas=['cB64a','cB64b']; labels=['a','b']
+
+beta={'cB211.072.64':1.778,'cC211.060.80':1.836,'cD211.054.96':1.900}[ens]
+factor=beta/3
 
 inserts=["tt", "tx", "ty", "tz", "xx", "xy", "xz", "yy", "yz", "zz"]
 inserts_nums=["33", "03", "13", "23", "00", "01", "02", "11", "12", "22"] # symmetric 
@@ -52,7 +54,7 @@ def run(cfg):
                 t=[float(part[0])+1j*float(part[1]) for part in (row.split(' ')[-2:] for row in t)]
                 t=np.reshape(t,(N_T,N_mom))
                 t_jg.append(t)
-            t_jg=np.transpose(t_jg,[1,2,0])
+            t_jg=np.transpose(t_jg,[1,2,0])*factor
             fw.create_dataset(f'data/jg;stout{stout}',data=t_jg)
             
     print('flag_cfg_done: '+cfg)
