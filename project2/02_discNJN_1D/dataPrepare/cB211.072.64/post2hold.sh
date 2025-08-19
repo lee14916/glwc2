@@ -11,7 +11,7 @@ out=${base}/data_post_hold
 #     done
 # done
 
-in=${base}/loop_cyclone
+in=${base}/cyclone
 for cfg in `ls ${in}`
 do
     mkdir -p ${out}/${cfg}
