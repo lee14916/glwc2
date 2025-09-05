@@ -1,4 +1,4 @@
-base=/p/project/ngff/li47/code/projectData/02_discNJN_1D/cC211.060.80
+base=/p/project1/ngff/li47/code/projectData/02_discNJN_1D/cC211.060.80
 out=${base}/data_post_hold
 
 # in=${base}/data_post_N
@@ -11,7 +11,7 @@ out=${base}/data_post_hold
 #     done
 # done
 
-in=${base}/loop_cyclone
+in=${base}/cyclone
 for cfg in `ls ${in}`
 do
     mkdir -p ${out}/${cfg}

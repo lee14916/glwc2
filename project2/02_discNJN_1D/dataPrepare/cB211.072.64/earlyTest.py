@@ -32,18 +32,11 @@ with h5py.File(outpath,'w') as fw:
         
             ind=moms.index((0,0,0))
             t=f['data/N_N'][:,ind]
-            t_bw=f['data_bw/N_N'][:,ind]
-            t_bw=-np.concatenate([[0],np.flip(t_bw)])
-            t=(t+t_bw)/2
             t1s.append(t)
             
             inds=[moms.index(mom) for mom in [(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)]]
             t=f['data/N_N'][:,:]
             t=np.mean(t[:,inds],axis=1)
-            t_bw=f['data_bw/N_N'][:,:]
-            t_bw=np.mean(t_bw[:,inds],axis=1)
-            t_bw=-np.concatenate([[0],np.flip(t_bw)])
-            t=(t+t_bw)/2
             t2s.append(t)
             
             # for mom in [(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)]:
@@ -60,7 +53,6 @@ with h5py.File(outpath,'w') as fw:
     for fla in flas:
         t1s={tf:[] for tf in tfs}
         t2s={tf:[] for tf in tfs}
-        t2s_bw={tf:[] for tf in tfs}
         tjs=[]
         for i,cfg in enumerate(cfgs):
             print(f'{fla}, {i}/{len(cfgs)}',end='          \r')
@@ -89,8 +81,6 @@ with h5py.File(outpath,'w') as fw:
                 
                 for tf in tfs:
                     t=f['data']['N_N_'+fla+';g{m,Dn};tl_'+str(tf)][:,i_mom,0,i_insert]
-                    t_bw=-f['data_bw']['N_N_'+fla+';g{m,Dn};tl_'+str(tf)][:,i_mom,0,i_insert]
-                    t=(t+t_bw)/2
                     t1s[tf].append(t)
                 
                 cases=[
@@ -99,12 +89,11 @@ with h5py.File(outpath,'w') as fw:
                     [(0,0,1,0,0,0),'tz',1],[(0,0,-1,0,0,0),'tz',-1],
                 ]
                 for tf in tfs:
-                    t=0; t_bw=0
+                    t=0
                     for mom,insert,factor in cases:
                         i_mom=moms.index(mom); i_insert=inserts.index(insert)
                         t += factor * f['data']['N_N_'+fla+';g{m,Dn};tl_'+str(tf)][:,i_mom,0,i_insert]
-                        t_bw += factor * f['data_bw']['N_N_'+fla+';g{m,Dn};tl_'+str(tf)][:,i_mom,0,i_insert]
-                    t=(t+t_bw)/2/6
+                    t=t/6
                     t2s[tf].append(t)
             # break
         for tf in tfs:
@@ -117,7 +106,6 @@ with h5py.File(outpath,'w') as fw:
     for fla in flas:
         t1s={tf:[] for tf in tfs}
         t2s={tf:[] for tf in tfs}
-        t2s_bw={tf:[] for tf in tfs}
         tjs=[]
         for i,cfg in enumerate(cfgs):
             print(f'{fla}, {i}/{len(cfgs)}',end='          \r')
@@ -146,8 +134,6 @@ with h5py.File(outpath,'w') as fw:
                 
                 for tf in tfs:
                     t=f['data']['N_N_'+fla+'_'+str(tf)][:,i_mom,0,i_insert]
-                    t_bw=-f['data_bw']['N_N_'+fla+'_'+str(tf)][:,i_mom,0,i_insert]
-                    t=(t+t_bw)/2
                     t1s[tf].append(t)
                 
                 cases=[
@@ -156,12 +142,11 @@ with h5py.File(outpath,'w') as fw:
                     [(0,0,1,0,0,0),'tz',1],[(0,0,-1,0,0,0),'tz',-1],
                 ]
                 for tf in tfs:
-                    t=0; t_bw=0
+                    t=0
                     for mom,insert,factor in cases:
                         i_mom=moms.index(mom); i_insert=inserts.index(insert)
                         t += factor * f['data']['N_N_'+fla+'_'+str(tf)][:,i_mom,0,i_insert]
-                        t_bw += factor * f['data_bw']['N_N_'+fla+'_'+str(tf)][:,i_mom,0,i_insert]
-                    t=(t+t_bw)/2/6
+                    t=t/6
                     t2s[tf].append(t)
             # break
         for tf in tfs:
@@ -169,6 +154,7 @@ with h5py.File(outpath,'w') as fw:
             fw.create_dataset(f'{fla}/P4i(G0,pi,pi)/{tf}',data=t2s[tf])
         fw.create_dataset(f'{fla}/P44(G0,0,0)_vev',data=tjs)
         # break
+
     
     # cases=[
     #     [(1,0,0,0,0,0),'tx',1],[(-1,0,0,0,0,0),'tx',-1],

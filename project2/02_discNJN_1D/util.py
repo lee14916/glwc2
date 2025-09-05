@@ -290,6 +290,10 @@ def un2str(x, xe, precision=2):
 
     # format - nom(unc)exp
     fieldw = x_exp - no_exp
+    
+    if fieldw<0:
+        return un2str(x, xe, precision+1)
+    
     fmt = '%%.%df' % fieldw
     result1 = (fmt + '(%.0f)e%d') % (no_int*10**(-fieldw), un_int, x_exp)
 
