@@ -36,6 +36,17 @@ def propagateError(func,mean,cov):
     y_cov=A@cov@AT
     return (np.array(y_mean),np.sqrt(np.diag(y_cov)),y_cov)
 
+def getCDR(cov):
+    errs=np.sqrt(np.diag(cov))
+    rho=cov/np.outer(errs, errs)
+    
+    evals=np.linalg.eigvalsh(rho)
+    eval_max=np.max(evals); eval_min=np.min(evals)
+    kappa=eval_max/eval_min
+    CDR=10*np.log10(kappa)
+    return CDR
+
+
 def jackknife(dat,d:int=0,nmin:int=6000):
     n=len(dat)
     if flag_fast:
@@ -203,6 +214,13 @@ def jackknife2(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:in
         
     ret=(mean,err,cov)
     return ret
+
+def superjackknife(dats_jk):
+    Nens=len(dats_jk)
+    Ncfgss=[len(dat) for dat in dats_jk]
+    dats_jkmean=[np.mean(dat_jk,axis=0) for dat_jk in dats_jk]
+    t=[[dats_jk[i] if i==j else np.repeat(dats_jkmean[j][None,:],Ncfgss[i],axis=0) for j in range(Nens)] for i in range(Nens)]
+    return np.block(t)
 
 def jackMA(fits,propagateChi2=True):
     ''' 

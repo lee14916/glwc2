@@ -4,7 +4,7 @@ nohup python3 -u avg2merge.py > log/avg2merge.out &
 import os, click, h5py, re
 import numpy as np
 
-ens='cB211.072.64'
+ens='cC211.060.80'
 
 path='data_aux/cfgs_run'
 with open(path,'r') as f:

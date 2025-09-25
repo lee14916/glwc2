@@ -41,8 +41,8 @@ P0n=(id-gamma_4)/4; Pxn=1j*gamma_5@gamma_1@P0n; Pyn=1j*gamma_5@gamma_2@P0n; Pzn=
 dirac2proj=np.array([[complex(ele) for row in proj.T for ele in row] for proj in [P0,Px,Py,Pz]])[:,[0,1,4,5]]
 dirac2proj_bw=np.array([[complex(ele) for row in proj.T for ele in row] for proj in [P0n,Pxn,Pyn,Pzn]])[:,[10,11,14,15]]
 
-# stouts=range(0,41)
-stouts=[4,7,10,13,16,19,22]
+stouts=range(0,41)
+# stouts=[4,7,10,13,16,19,22]
 
 @click.command()
 @click.option('-c','--cfg')

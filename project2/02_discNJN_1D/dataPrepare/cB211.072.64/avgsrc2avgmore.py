@@ -4,6 +4,7 @@ cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u avgsrc2avgmore.py -c @ > log
 import h5py,os,re,click
 import numpy as np
 from itertools import permutations
+from sympy.combinatorics import Permutation
 
 ens='cB211.072.64'
 
@@ -84,7 +85,7 @@ def run(cfg):
             os.remove(outfile_flag)
 
     flag=True
-    for j in ['j+','js','jc','jg']:
+    for j in ['j+','js','jc','jg'][:]:
         filename=f'discNJN_{j};g{{m,Dn}};tl.h5'
         inserts_name='inserts;g{m,Dn};tl'
         
@@ -110,19 +111,19 @@ def run(cfg):
                     
                     inserts=[insert.decode() for insert in f[inserts_name][:]]
                     
-                    elements=[(sx,sy,sz,xyz) for sx in [-1,1] for sy in [-1,1] for sz in [-1,1] for xyz in permutations([0, 1, 2], 3)]
+                    elements=[(sx,sy,sz,xyz) for sx in [1,-1] for sy in [1,-1] for sz in [1,-1] for xyz in permutations([0, 1, 2], 3)]
                     
                     e2inds_mom={}; e2inds_proj={}; e2signs_proj={}; e2inds_insert={}; e2signs_insert={}
                     for e in elements:
                         sx,sy,sz,xyz=e; signs=[sx,sy,sz,1]
                         ix,iy,iz=xyz; iix,iiy,iiz=tuple([ix,iy,iz].index(i) for i in range(3))
-                        
                         xyzt=['x','y','z','t']
                         xyzt2={'x':xyzt[ix],'y':xyzt[iy],'z':xyzt[iz],'t':'t'}
+                        det=sx*sy*sz*(1 if Permutation(xyz).is_even else -1)
                         
-                        e2inds_mom[e]=[dic[(mom[0],mom[1],mom[2],sx*mom[iix+3],sy*mom[iiy+3],sz*mom[iiz+3])] for mom in moms_target]
+                        e2inds_mom[e]=[dic[(sx*mom[iix],sy*mom[iiy],sz*mom[iiz],sx*mom[iix+3],sy*mom[iiy+3],sz*mom[iiz+3])] for mom in moms_target]
                         
-                        e2signs_proj[e]=np.array([1,sx,sy,sz])[None,None,:,None]
+                        e2signs_proj[e]=np.array([1,sx*det,sy*det,sz*det])[None,None,:,None]
                         e2inds_proj[e]=[0,ix+1,iy+1,iz+1]
                         
                         e2signs_insert[e]=np.array([signs[xyzt.index(insert[0])]*signs[xyzt.index(insert[1])] for insert in inserts])[None,None,None,:]
@@ -147,7 +148,17 @@ def run(cfg):
                             
                             t=t*e2signs_insert[e]
                             t=t[:,:,:,e2inds_insert[e]]
+                            
+                            # print(e,np.real(t[0,imom,iproj,iins]),moms[e2inds_mom[e][imom]],e2signs_proj[e][0,0,iproj,0],e2inds_proj[e][iproj],e2signs_insert[e][0,0,0,iins],e2inds_insert[e][iins])
                             return t
+                        
+
+                        # print(moms_target[imom])
+                        # t=np.array([get(e) for e in elements])
+                        # print(t.shape)
+                        # t=np.real(t[:,0,imom,iproj,iins])
+                        # print(np.mean(t))
+                        # print(t)
                         
                         t=np.mean([get(e) for e in elements],axis=0)
                         fw.create_dataset(f'data/{key}',data=t)

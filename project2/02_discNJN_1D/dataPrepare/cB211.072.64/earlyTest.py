@@ -5,7 +5,7 @@ import h5py,os,re,click
 import numpy as np
 
 ens='cB211.072.64'
-inpath=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_new/{ens}/data_avgsrc/'
+inpath=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run1/{ens}/data_avgsrc/'
 inpath_loop=f'/p/project1/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_post/'
 outpath=f'/p/project1/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_earlytest/test2.h5'
 
