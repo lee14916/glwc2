@@ -104,6 +104,7 @@ def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[]):
         else:
             fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
     pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True)[:2]
+    # print(pars_mean)
     
     if flag_fast == "FastFit": # Generate pseudo jackknife resamples from the single fit rather than doing lots of fits
         n=len(y_jk)
@@ -126,7 +127,16 @@ def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[]):
                 pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
             else:
                 pars_jk=np.array([leastsq(lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]),pars_mean)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
-    chi2_jk=np.array([[np.sum(fitfunc_wrapper(pars)**2)] for pars in pars_jk])
+    if parsExtra_jk is None:
+        if len(priors)==0:
+            chi2_jk=np.array([np.sum((cho_L_Inv@(fitfunc(pars)-y))**2) for pars,y in zip(pars_jk,y_jk)])
+        else:
+            chi2_jk=np.array([np.sum((np.concatenate([cho_L_Inv@(fitfunc(pars)-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]))**2) for pars,y in zip(pars_jk,y_jk)])
+    else:
+        if len(priors)==0:
+            chi2_jk=np.array([np.sum((cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y))**2) for pars,parsExtra,y in zip(pars_jk,parsExtra_jk,y_jk)])
+        else:
+            chi2_jk=np.array([np.sum(np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]])**2) for pars,parsExtra,y in zip(pars_jk,parsExtra_jk,y_jk)])
     Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
     return pars_jk,chi2_jk,Ndof
 def jackknife2(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:int=600,d:int=0,outputFlatten=False,sl_key=None,sl_saveQ=False):
@@ -210,7 +220,7 @@ def jackMA(fits,propagateChi2=True):
     '''
     if propagateChi2:
         temp=[(pars_jk
-            ,np.exp(-chi2_jk/2+Ndof) # weights_jk
+            ,np.exp(-chi2_jk[:,None]/2+Ndof) # weights_jk
             ) for fit_label,pars_jk,chi2_jk,Ndof in fits]
     else:
         temp=[(pars_jk
@@ -290,6 +300,10 @@ def un2str(x, xe, precision=2):
 
     # format - nom(unc)exp
     fieldw = x_exp - no_exp
+    
+    if fieldw<0:
+        return un2str(x, xe, precision+1)
+    
     fmt = '%%.%df' % fieldw
     result1 = (fmt + '(%.0f)e%d') % (no_int*10**(-fieldw), un_int, x_exp)
 

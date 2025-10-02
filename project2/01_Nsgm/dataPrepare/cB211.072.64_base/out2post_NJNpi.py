@@ -6,10 +6,11 @@ import os, click, h5py, re, pickle
 import numpy as np
 import auxx as aux
 
-postcode='NJNpi-Nsrc=4*1'
+postcode='NJNpi-Nsrc=4*4_16-20'
 def cfg2out(cfg):
     t='' if cfg[0]=='a' else '_b'
-    path = f'/capstor/store/cscs/userlab/s1174/fpittler/runs/njnsigma_physical_point_64{t}/{cfg[1:]}/'
+    # path = f'/capstor/store/cscs/userlab/s1174/fpittler/runs/njnsigma_physical_point_64{t}/{cfg[1:]}/'
+    path = f'/capstor/store/cscs/userlab/s1174/fpittler/runs/njnsigma_physical_point_64{t}_addition/{cfg[1:]}/'
     return path 
 
 flags={
