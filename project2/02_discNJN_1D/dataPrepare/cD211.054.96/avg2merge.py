@@ -10,7 +10,9 @@ path='data_aux/cfgs_run'
 with open(path,'r') as f:
     cfgs=f.read().splitlines()
     
-basepath=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run2/{ens}/'
+case='data_avgsrc'
+    
+basepath=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run1/{ens}/'
 inpath_loop=f'/p/project1/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_post/'
 
 def run():
@@ -20,7 +22,7 @@ def run():
     dat={}
     for cfg in cfgs:
         print(cfg,end='                \r')
-        inpath=f'{basepath}data_avgmore/{cfg}/'
+        inpath=f'{basepath}{case}/{cfg}/'
         for file in os.listdir(inpath):
             infile=f'{inpath}{file}'
             if file not in dat:

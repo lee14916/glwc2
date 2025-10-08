@@ -10,11 +10,11 @@ lat_L={'cB211.072.64':64,'cC211.060.80':80,'cD211.054.96':96,'cE211.044.112':112
 
 # max_mom2={'cB211.072.64':23,'cC211.060.80':26,'cD211.054.96':26,'cE211.044.112':4}[ens]
 # max_mom2={'cB211.072.64':1,'cC211.060.80':1,'cD211.054.96':1,'cE211.044.112':1}[ens]
-max_mom2={'cB211.072.64':14,'cC211.060.80':16,'cD211.054.96':16,'cE211.044.112':4}[ens]
+max_mom2={'cB211.072.64':16,'cC211.060.80':16,'cD211.054.96':16,'cE211.044.112':16}[ens]
 range_xyz=range(-int(np.sqrt(max_mom2))-1,int(np.sqrt(max_mom2))+2)
 moms_pc=[[x,y,z] for x in range_xyz for y in range_xyz for z in range_xyz if x**2+y**2+z**2<=max_mom2]
 
-max_mom2=0
+max_mom2=1
 range_xyz=range(-int(np.sqrt(max_mom2))-1,int(np.sqrt(max_mom2))+2)
 moms_pf=[[x,y,z] for x in range_xyz for y in range_xyz for z in range_xyz if x**2+y**2+z**2<=max_mom2]
 
@@ -26,8 +26,7 @@ moms_target.sort()
 tfs={'cB211.072.64':range(2,22+1),'cC211.060.80':range(2,26+1),'cD211.054.96':range(2,30+1),'cE211.044.112':range(2,32+1)}[ens]
 
 stouts=range(0,40+1)
-stouts=[4,7,10,13,16,19,22]
-# stouts=range(0,4)
+stouts=[7,10,13,20]
 
 def src2ints(src):
     (sx,sy,sz,st)=re.search('sx([0-9]*)sy([0-9]*)sz([0-9]*)st([0-9]*)',src).groups()
@@ -38,7 +37,7 @@ def get_phase(src_int,mom):
     (sx,sy,sz,st)=src_int
     return np.exp(1j*(2*np.pi/lat_L)*(np.array([sx,sy,sz])@mom))
 
-basepath=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run2/{ens}/'
+basepath=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run3/{ens}/'
 
 def run_post2avgsrc(cfg):
     inpath=f'/p/project1/ngff/li47/code/projectData/02_discNJN_1D/{ens}/data_post/{cfg}/'
@@ -187,8 +186,6 @@ def run_post2avgsrc(cfg):
                         t_bw=t_bw*signs[None,None,:,None]
                         t=(t+t_bw)/2
                         fw.create_dataset(f'data/{fla}_{j}_{tf}',data=t)
-                        
-                        print(t.shape)
 
                 os.remove(outfile_flag)
                 

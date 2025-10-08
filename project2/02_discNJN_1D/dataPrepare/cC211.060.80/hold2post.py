@@ -14,13 +14,13 @@ flags={
 
 #=========================================================================================
 
-Nmax=0
+Nmax=1
 Nmax_sq=int(np.floor(np.sqrt(Nmax))); t_range=range(-Nmax_sq,Nmax_sq+1)
 moms_N=[[x,y,z] for x in t_range for y in t_range for z in t_range if x**2+y**2+z**2<=Nmax]
 moms_N.sort()
 #
 # Nmax={'cB211.072.64':23,'cC211.060.80':26,'cD211.054.96':26,'cE211.044.112':4}[ens]
-Nmax={'cB211.072.64':14,'cC211.060.80':16,'cD211.054.96':16,'cE211.044.112':4}[ens]
+Nmax={'cB211.072.64':16,'cC211.060.80':16,'cD211.054.96':16,'cE211.044.112':16}[ens]
 # Nmax={'cB211.072.64':1,'cC211.060.80':1,'cD211.054.96':1,'cE211.044.112':1}[ens]
 Nmax_sq=int(np.floor(np.sqrt(Nmax))); t_range=range(-Nmax_sq,Nmax_sq+1)
 moms_j=[[x,y,z] for x in t_range for y in t_range for z in t_range if x**2+y**2+z**2<=Nmax]
@@ -42,7 +42,7 @@ dirac2proj=np.array([[complex(ele) for row in proj.T for ele in row] for proj in
 dirac2proj_bw=np.array([[complex(ele) for row in proj.T for ele in row] for proj in [P0n,Pxn,Pyn,Pzn]])[:,[10,11,14,15]]
 
 stouts=range(0,41)
-# stouts=[4,7,10,13,16,19,22]
+stouts=[7,10,13,20]
 
 @click.command()
 @click.option('-c','--cfg')

@@ -91,7 +91,7 @@ def jackknife_pseudo(mean,cov,n):
     B=mean-A*mean1
     dat_jk=A[None,:]*dat_jk+B[None,:]
     return dat_jk
-def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[]):
+def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[],**kargs):
     '''
     priors=[(ind of par, mean, width)]
     '''
@@ -114,7 +114,7 @@ def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[]):
             fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean)
         else:
             fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-    pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True)[:2]
+    pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True,**kargs)[:2]
     
     if flag_fast == "FastFit": # Generate pseudo jackknife resamples from the single fit rather than doing lots of fits
         n=len(y_jk)
@@ -124,19 +124,19 @@ def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[]):
             if len(priors)==0:
                 def func(dat):
                     fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
-                    pars=leastsq(fitfunc_wrapper2,pars_mean)[0]
+                    pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
                     return pars
             else:
                 def func(dat):
                     fitfunc_wrapper2=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-dat),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-                    pars=leastsq(fitfunc_wrapper2,pars_mean)[0]
+                    pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
                     return pars
             pars_jk=jackmap(func,y_jk)
         else:
             if len(priors)==0:
-                pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
+                pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
             else:
-                pars_jk=np.array([leastsq(lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]),pars_mean)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
+                pars_jk=np.array([leastsq(lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
     chi2_jk=np.array([[np.sum(fitfunc_wrapper(pars)**2)] for pars in pars_jk])
     Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
     return pars_jk,chi2_jk,Ndof
