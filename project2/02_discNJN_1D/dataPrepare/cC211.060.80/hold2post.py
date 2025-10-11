@@ -14,7 +14,7 @@ flags={
 
 #=========================================================================================
 
-Nmax=1
+Nmax=0
 Nmax_sq=int(np.floor(np.sqrt(Nmax))); t_range=range(-Nmax_sq,Nmax_sq+1)
 moms_N=[[x,y,z] for x in t_range for y in t_range for z in t_range if x**2+y**2+z**2<=Nmax]
 moms_N.sort()
@@ -42,7 +42,8 @@ dirac2proj=np.array([[complex(ele) for row in proj.T for ele in row] for proj in
 dirac2proj_bw=np.array([[complex(ele) for row in proj.T for ele in row] for proj in [P0n,Pxn,Pyn,Pzn]])[:,[10,11,14,15]]
 
 stouts=range(0,41)
-stouts=[7,10,13,20]
+# stouts=[7,10,13,20]
+stouts=[5,7,10,13,15,20,25,30]
 
 @click.command()
 @click.option('-c','--cfg')

@@ -283,7 +283,7 @@ def jackMA2(fits): # doing model average after jackknife
 
 # 
 # uncertainty to string: taken from https://stackoverflow.com/questions/6671053/python-pretty-print-errorbars
-def un2str(x, xe, precision=2):
+def un2str(x, xe, precision=2, forceResult = None):
     """pretty print nominal value and uncertainty
 
     x  - nominal value
@@ -322,6 +322,9 @@ def un2str(x, xe, precision=2):
     if un_exp<0 and un_int*10**un_exp>=1:
         fmt2= '(%%.%df)' % (-un_exp)
         result2 = (fmt + fmt2) % (no_int*10**no_exp, un_int*10**un_exp)
+        
+    if forceResult is not None:
+        return [result1,result2][forceResult]
 
     # return shortest representation
     if len(result2) <= len(result1):
