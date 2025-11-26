@@ -69,7 +69,7 @@ print(inserts)
 ###
 data={}
 for ens in enss:
-    path=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run2/{ens2full[ens]}/data_merge/data.h5'
+    path=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run3/{ens2full[ens]}/data_merge/data.h5'
     with h5py.File(path) as f:
         moms=f['N.h5/moms'][:]
         moms=[tuple(mom) for mom in moms]
@@ -479,7 +479,7 @@ useQ([1,0,0,0,0,0],'P0','xx')
 from scipy.linalg import sqrtm
 funcs_ri=[np.real,np.imag]
 
-name='_unequal'
+name='_equal'
 
 def standarizeMom(mom):
     t=np.abs(mom)
@@ -543,7 +543,7 @@ def run(ens):
                         cNb[:,:tf+1]/cNb[:,:tf+1][:,::-1]
                 )[:,:,None,None]
                 
-                pirs=[(proj,insert,ri) for proj in projs for insert in inserts for ri in [0,1] if insert[0]!=insert[1] and useQ(mom,proj,insert)[ri]]
+                pirs=[(proj,insert,ri) for proj in projs for insert in inserts for ri in [0,1] if insert[0]==insert[1] and useQ(mom,proj,insert)[ri]]
                 # pirs=[(proj,insert,ri) for proj in projs for insert in inserts for ri in [0,1] if useQ(mom,proj,insert)[ri]]
                 G=np.array([[funcs_ri[ri](ME2FF(m,pvec,p1vec,proj,insert)) for proj,insert,ri in pirs] for m in ens2mN[ens]])
                 

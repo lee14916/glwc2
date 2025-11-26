@@ -309,11 +309,13 @@ def un2str(x, xe, precision=2, forceResult = None):
     # format - nom(unc)exp
     fieldw = x_exp - no_exp
     
-    if fieldw<0:
-        return un2str(x, xe, precision+1)
-    
-    fmt = '%%.%df' % fieldw
-    result1 = (fmt + '(%.0f)e%d') % (no_int*10**(-fieldw), un_int, x_exp)
+    if fieldw<0 and forceResult!=1:
+        return un2str(x, xe, precision+1,forceResult=forceResult)
+    if fieldw>=0:
+        fmt = '%%.%df' % fieldw
+        result1 = (fmt + '(%.0f)e%d') % (no_int*10**(-fieldw), un_int, x_exp)
+    else:
+        result1 = None
 
     # format - nom(unc)
     fieldw = max(0, -no_exp)
@@ -322,7 +324,7 @@ def un2str(x, xe, precision=2, forceResult = None):
     if un_exp<0 and un_int*10**un_exp>=1:
         fmt2= '(%%.%df)' % (-un_exp)
         result2 = (fmt + fmt2) % (no_int*10**no_exp, un_int*10**un_exp)
-        
+    
     if forceResult is not None:
         return [result1,result2][forceResult]
 
