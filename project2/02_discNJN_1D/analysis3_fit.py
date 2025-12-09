@@ -69,7 +69,7 @@ print(inserts)
 ###
 data={}
 for ens in enss:
-    path=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run2/{ens2full[ens]}/data_merge/data.h5'
+    path=f'/p/project1/ngff/li47/code/scratch/run/02_discNJN_1D_run3/{ens2full[ens]}/data_merge/data.h5'
     with h5py.File(path) as f:
         moms=f['N.h5/moms'][:]
         moms=[tuple(mom) for mom in moms]
@@ -474,7 +474,7 @@ useQ([0,0,0,0,0,0],'P0','zz')
 
 # fit
 
-name=''
+name='_equal'
 
 FFs=[]; js=[]; moms_str=[]
 for ens in enss:
@@ -700,6 +700,10 @@ def run(key):
     ens2res=doFit(ens2dat,f'{FF}_{j}_[{mom_str}]',f'{FF}_{j}',symmetrizeQ = np.all(mom[3:]==[0,0,0]))
     
     outpath=f'/p/project1/ngff/li47/code/projectData/02_discNJN_1D/analysis3_ratioSVD_fitres{name}.h5'
+    if not os.path.exists(outpath):
+        with h5py.File(outpath,'w') as fw:
+            pass
+    
     with h5py.File(outpath,'r+') as fw:
         for ens in ens2res.keys():
             key=f'{ens}/{FF}_{j}/{mom_str}'

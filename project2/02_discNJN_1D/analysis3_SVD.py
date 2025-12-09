@@ -399,7 +399,10 @@ def ME2FF(m,pvec,pvec1,proj,insert):
     
     #==============================
     factorA= 1j; factorB= -1j; factorC=1
-    factorBase=1/(4*m**2); factorSgm=1
+    factorSgm=1
+    
+    xE=pt/1j; xE1=p1t/1j
+    factorBase=1/np.sqrt(2*xE1*(xE1+m)*2*xE*(xE+m))
     
     la=(gm[mu]*P[nu]/2+gm[nu]*P[mu]/2)/2-(np.sum(gm*P[:,None,None]/2,axis=0))*id[mu,nu]/4
     lb=(1j/(2*m))*((np.einsum('rab,r->ab',sgm[mu],q)*P[nu]/2+np.einsum('rab,r->ab',sgm[nu],q)*P[mu]/2)/2-np.einsum('srab,r,s->ab',sgm,q,P/2)*id[mu,nu]/4)*factorSgm
@@ -462,15 +465,15 @@ def useQ(mom,proj,insert):
         return (False,False)
     return (r,i)
 
-ME2FF(sp.symbols('m'),sp.symbols('px py pz'),sp.symbols('p1x p1y p1z'),'Px','xy')
+# ME2FF(sp.symbols('m'),sp.symbols('px py pz'),sp.symbols('p1x p1y p1z'),'Px','xy')
 
-ME2FF(1,[0,0,0],[0,0,0],'P0','tt')
+# ME2FF(1,[0,0,0],[0,0,0],'P0','tt')
 
-nonzeroQ([0,0,0,0,0,0],'P0','tt')
+# nonzeroQ([0,0,0,0,0,0],'P0','tt')
 
-useQ([0,0,0,0,0,0],'P0','zz')
+# useQ([0,0,0,0,0,0],'P0','zz')
 
-useQ([1,0,0,0,0,0],'P0','xx')
+# useQ([1,0,0,0,0,0],'P0','xx')
 ###
 
 

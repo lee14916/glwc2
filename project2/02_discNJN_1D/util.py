@@ -83,6 +83,11 @@ def jackmap(func,dat_jk):
         return tuple([np.array([t[i][ind] for i in range(len(t))]) for ind in range(len(t[0]))])
     return np.array(t)
 def jackknife_pseudo(mean,cov,n):
+    mean=np.array(mean); cov=np.array(cov)
+    if len(mean.shape)==len(cov.shape)==0:
+        mean=mean[None]; cov=cov[None,None]**2
+    if len(mean.shape)==len(cov.shape)==1:
+        cov=np.diag(cov**2)
     dat_ens=np.random.multivariate_normal(mean,cov*n,n)
     dat_jk=jackknife(dat_ens)
     # do transformation [pars_jk -> A pars_jk + B] to force pseudo mean and err exactly the same
