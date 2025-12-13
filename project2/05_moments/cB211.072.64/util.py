@@ -7,6 +7,7 @@ import matplotlib as mpl
 import math,cmath
 from math import floor, log10
 import pickle
+import functools
 from scipy.optimize import leastsq, curve_fit, fsolve
 from scipy.linalg import solve_triangular,cholesky
 from inspect import signature
@@ -29,9 +30,25 @@ mpl.rcParams['legend.fontsize'] = 24
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["mathtext.fontset"] = "dejavuserif"
 
-__all__ = ['np','os','plt','pickle','h5py','mpl','PdfPages']
+__all__ = ['np','os','plt','h5py','pickle']
 
-flag_fast=False # If True, certain functions will be speeded up using approximations.
+#!============== Initialization ==============#
+if True:
+    flag_fast=False # If True, certain functions will be speeded up using approximations.
+    try:
+        basepath_fig,basepath_pkl
+    except:
+        basepath_fig=None; basepath_pkl=None
+    def setpath_fig(path):
+        assert(path.endswith('/'))
+        global basepath_fig
+        basepath_fig=path
+        os.makedirs(basepath_fig,exist_ok=True)
+    def setpath_pkl(path):
+        assert(path.endswith('/'))
+        global basepath_pkl
+        basepath_pkl=path
+        os.makedirs(basepath_pkl,exist_ok=True)
 
 #!============== small functions ==============#
 if True:
@@ -57,12 +74,37 @@ if True:
         for i,mom in enumerate(moms):
             dic[tuple(mom)]=i
         return dic
-    
     def moms2list(moms):
         return [list(mom) for mom in moms]
     
     def decodeList(l):
         return [ele.decode() for ele in l]
+    
+    def any2filename(t):
+        if type(t)==str:
+            return t
+        if type(t)==list:
+            return ';'.join(t)
+        1/0
+    def save_pkl(file,res):
+        if basepath_pkl is None:
+            print('basepath_pkl is None')
+            return
+        with open(f'{basepath_pkl}{any2filename(file)}.pkl','wb') as f:
+            pickle.dump(res,f)
+    def load_pkl(file):
+        if basepath_pkl is None:
+            print('basepath_pkl is None')
+            return
+        if not os.path.isfile(f'{basepath_pkl}{any2filename(file)}.pkl'):
+            return None
+        with open(f'{basepath_pkl}{any2filename(file)}.pkl','rb') as f:
+            res=pickle.load(f)
+        return res
+    def clear_pkl(file):
+        if os.path.isfile(f'{basepath_pkl}{any2filename(file)}.pkl'):
+            os.remove(f'{basepath_pkl}{any2filename(file)}.pkl')
+     
 #!============== error analysis ==============#
 if True:
     def propagateError(func,mean,cov):
@@ -138,55 +180,7 @@ if True:
         B=mean-A*mean1
         dat_jk=A[None,:]*dat_jk+B[None,:]
         return dat_jk
-    def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[],**kargs):
-        '''
-        priors=[(ind of par, mean, width)]
-        '''
-        y_mean,_,y_cov=jackmec(y_jk)
-        if mask is not None:
-            if mask == 'uncorrelated':
-                y_cov=np.diag(np.diag(y_cov))
-            else:
-                y_cov=y_cov*mask
-            
-        cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True)) # y_cov^{-1}=cho_L_Inv^T@cho_L_Inv
-        if parsExtra_jk is None:
-            if len(priors)==0:
-                fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
-            else:
-                fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-        else:
-            parsExtra_mean=list(np.mean(parsExtra_jk,axis=0))
-            if len(priors)==0:
-                fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean)
-            else:
-                fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-        pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True,**kargs)[:2]
-        
-        if flag_fast == "FastFit": # Generate pseudo jackknife resamples from the single fit rather than doing lots of fits
-            n=len(y_jk)
-            pars_jk=jackknife_pseudo(pars_mean,pars_cov,n)
-        else:
-            if parsExtra_jk is None:
-                if len(priors)==0:
-                    def func(dat):
-                        fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
-                        pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
-                        return pars
-                else:
-                    def func(dat):
-                        fitfunc_wrapper2=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-dat),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-                        pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
-                        return pars
-                pars_jk=jackmap(func,y_jk)
-            else:
-                if len(priors)==0:
-                    pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
-                else:
-                    pars_jk=np.array([leastsq(lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
-        chi2_jk=np.array([[np.sum(fitfunc_wrapper(pars)**2)] for pars in pars_jk])
-        Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
-        return pars_jk,chi2_jk,Ndof
+    
     def jackknife2(in_dat,in_func=lambda dat:np.mean(np.real(dat),axis=0),minNcfg:int=600,d:int=0,outputFlatten=False,sl_key=None,sl_saveQ=False):
         '''
         - in_dat: any-dimensional list of ndarrays. Each ndarray in the list has 0-axis for cfgs
@@ -379,8 +373,59 @@ if True:
             return result2
         else:
             return result1
+
 #!============== fit ==============#
 if True:
+    def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[],**kargs):
+        '''
+        priors=[(ind of par, mean, width)]
+        '''
+        y_mean,_,y_cov=jackmec(y_jk)
+        if mask is not None:
+            if mask == 'uncorrelated':
+                y_cov=np.diag(np.diag(y_cov))
+            else:
+                y_cov=y_cov*mask
+            
+        cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True)) # y_cov^{-1}=cho_L_Inv^T@cho_L_Inv
+        if parsExtra_jk is None:
+            if len(priors)==0:
+                fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
+            else:
+                fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
+        else:
+            parsExtra_mean=list(np.mean(parsExtra_jk,axis=0))
+            if len(priors)==0:
+                fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean)
+            else:
+                fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
+        pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True,**kargs)[:2]
+        
+        if flag_fast == "FastFit": # Generate pseudo jackknife resamples from the single fit rather than doing lots of fits
+            n=len(y_jk)
+            pars_jk=jackknife_pseudo(pars_mean,pars_cov,n)
+        else:
+            if parsExtra_jk is None:
+                if len(priors)==0:
+                    def func(dat):
+                        fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
+                        pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
+                        return pars
+                else:
+                    def func(dat):
+                        fitfunc_wrapper2=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-dat),[(pars[ind]-mean)/width for ind,mean,width in priors]])
+                        pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
+                        return pars
+                pars_jk=jackmap(func,y_jk)
+            else:
+                if len(priors)==0:
+                    pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
+                else:
+                    pars_jk=np.array([leastsq(lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
+        chi2_jk=np.array([[np.sum(fitfunc_wrapper(pars)**2)] for pars in pars_jk])
+        Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
+        return pars_jk,chi2_jk,Ndof
+    
     def find_fitmax(dat,threshold=0.2):
         mean,err=jackme(dat)
         rela=np.abs(err/mean)
@@ -396,7 +441,85 @@ if True:
             return list(pars)*Ndata
         pars_jk,chi2_jk,Ndof=jackfit(fitfunc,y_jk,[np.mean(y_jk)],mask=None if corrQ else 'uncorrelated')
         return pars_jk,chi2_jk,Ndof
+    
+    def fits2text(fits):
+        text=[]
+        pars_jk,props_jk=jackMA(fits)
+        means,errs=jackme(pars_jk)
+        props_mean,props_err=jackme(props_jk)
+        ind_mpf=np.argmax(props_mean)
+        fitlabel,pars_jk,chi2_jk,Ndof = fits[ind_mpf]
+        chi2=np.mean(chi2_jk)
+        text.append(f'Model average: pars={[un2str(mean,err) for mean,err in zip(means,errs)]}, most probable fitlabel: {fits[ind_mpf][0]}, prop={int(props_mean[ind_mpf]*100)}%, chi2/Ndof={int(chi2*10)/10}/{Ndof}={int(chi2/Ndof*10)/10};')
+        for i,fit in enumerate(fits):
+            fitlabel,pars_jk,chi2_jk,Ndof = fit
+            means,errs=jackme(pars_jk); mean_chi2,err_chi2=jackme(chi2_jk)
+            text.append(f'fitlabel={fitlabel}, pars={[un2str(mean,err) for mean,err in zip(means,errs)]}, prop={int(props_mean[i]*100)}%, chi2/Ndof={int(mean_chi2[0]*10)/10}/{Ndof}={int(mean_chi2[0]/Ndof*10)/10};')
+        return text
+        
+    # def decorator_fits(TYPE='fits'):
+    #     def decorator(func):
+    #         @functools.wraps(func)
+    #         def wrapper(*args, label=None, overwrite=False, **kwargs):
+    #             if label is not None and not overwrite:
+    #                 res=load_pkl(label)
+    #                 if res is not None:
+    #                     return res
+    #             res = func(*args, **kwargs)
+    #             if label is not None:
+    #                 save_pkl(label,res)
+    #                 if TYPE is not None:
+    #                     if TYPE=='fits':
+    #                         text=fits2text(res)
+    #                     elif TYPE=='2pt':
+    #                         text=[]
+    #                         for i,fits in enumerate(res):
+    #                             text.append(f'{i} state fit')
+    #                             text.append(fits2text(fits))
+    #                             text.append('\n')
+    #                     with open(any2filename(label).txt,'w') as f:
+    #                         f.write(fits2text(res))
+    #             return res
+    #         return wrapper
+    #     return decorator
+    
+    def decorator_fits(func):
+        @functools.wraps(func)
+        def wrapper(*args, label=None, overwrite=False, **kwargs):
+            if label is not None and not overwrite:
+                res=load_pkl(label)
+                if res is not None:
+                    return res
+            res = func(*args, **kwargs)
+            if label is not None:
+                save_pkl(label,res)
+                text=fits2text(res)
+                with open(f'{basepath_pkl}{any2filename(label)}.txt','w') as f:
+                    f.write('\n'.join(text))
+            return res
+        return wrapper
+    def decorator_fits_2pt(func):
+        @functools.wraps(func)
+        def wrapper(*args, label=None, overwrite=False, **kwargs):
+            if label is not None and not overwrite:
+                res=load_pkl(label)
+                if res is not None:
+                    return res
+            res = func(*args, **kwargs)
+            if label is not None:
+                save_pkl(label,res)
+                text=[]
+                for i,fits in enumerate(res):
+                    text.append(f'{i+1} state fit')
+                    text+=fits2text(fits)
+                    text.append('\n')
+                with open(f'{basepath_pkl}{any2filename(label)}.txt','w') as f:
+                    f.write('\n'.join(text))
+            return res
+        return wrapper
+    
 
+    @decorator_fits
     def doFit_2pt(dat,tmins,func,pars0,downSampling=1,corrQ=True):
         tmax=find_fitmax(dat)
         fits=[]
@@ -416,6 +539,7 @@ if True:
     func_meff_1st=lambda t,E0: np.log(func_c2pt_1st(t,E0,1)/func_c2pt_1st(t+1,E0,1))
     func_meff_2st=lambda t,E0,dE1,rc1: np.log(func_c2pt_2st(t,E0,1,dE1,rc1)/func_c2pt_2st(t+1,E0,1,dE1,rc1))
     func_meff_3st=lambda t,E0,dE1,rc1,dE2,rc2: np.log(func_c2pt_3st(t,E0,1,dE1,rc1,dE2,rc2)/func_c2pt_3st(t+1,E0,1,dE1,rc1,dE2,rc2))
+    @decorator_fits_2pt
     def doFit_meff_nst(meff,tminss,pars0,downSampling=1,corrQ=True):
         Nst=len(tminss)
         fits_1st=doFit_2pt(meff,tminss[0],func_meff_1st,pars0[:1],downSampling=downSampling,corrQ=corrQ)
@@ -433,7 +557,8 @@ if True:
         fits_3st=doFit_2pt(meff,tminss[2],func_meff_3st,pars0[:5],downSampling=downSampling,corrQ=corrQ)
         if Nst==3:
             return [fits_1st,fits_2st,fits_3st]
-        
+    
+    @decorator_fits
     def doFit_3ptSym_1st(tf2ratio_para,tfmins,tcmins,pars0=None,downSampling=[1,1],symmetrizeQ=False,corrQ=True):
         tf2ratio=tf2ratio_para.copy()
         tfs=list(tf2ratio.keys()); tfs.sort()
@@ -464,6 +589,7 @@ if True:
     func_c3pt_2st=lambda tf,tc,E0a,E0b,a00,dE1a,dE1b,ra01,ra10,ra11: a00*np.exp(-E0a*(tf-tc))*np.exp(-E0b*tc)*(1 + ra01*np.exp(-dE1b*tc) + ra10*np.exp(-dE1a*(tf-tc)) + ra11*np.exp(-dE1a*(tf-tc))*np.exp(-dE1b*tc)) \
         if a00!=0 else np.exp(-E0a*(tf-tc))*np.exp(-E0b*tc)*(ra01*np.exp(-dE1b*tc) + ra10*np.exp(-dE1a*(tf-tc)) + ra11*np.exp(-dE1a*(tf-tc))*np.exp(-dE1b*tc))
     func_ratio_2st=lambda tf,tc,g,dE1,rc1,ra01,ra11:func_c3pt_2st(tf,tc,0,0,g,dE1,dE1,ra01,ra01,ra11)/func_c2pt_2st(tf,0,1,dE1,rc1)
+    @decorator_fits
     def doFit_3ptSym_2st2step(tf2ratio_para,tfmins,tcmins,pars_jk_meff2st,pars0=None,downSampling=[1,1],symmetrizeQ=False,corrQ=True):
         tf2ratio=tf2ratio_para.copy()
         tfs=list(tf2ratio.keys()); tfs.sort()
@@ -492,6 +618,7 @@ if True:
                 pars_jk,chi2_jk,Ndof=jackfit(fitfunc,y_jk,pars0,parsExtra_jk=pars_jk_meff2st,mask=None if corrQ else 'uncorrelated')
                 fits.append([(tfmin,tcmin),pars_jk,chi2_jk,Ndof])
         return fits
+
 #!============== plot ==============#
 if True:
     colors8=['r','g','b','orange','purple','brown','magenta','olive']
@@ -522,17 +649,21 @@ if True:
             ax.annotate(col, xy=(0.5, 1), xytext=(0, pad),
                     xycoords='axes fraction', textcoords='offset points', ha='center', va='baseline', fontsize=fontsize, **kargs)
 
-    def finalizePlt(file=None,closeQ=None):
+    def finalizePlot(file=None,closeQ=None):
         if closeQ is None:
             closeQ=False if file is None else True
         plt.tight_layout()
         if file!=None:
-            plt.savefig(file,bbox_inches="tight")
+            if basepath_fig is None:
+                print('basepath_fig is None')
+                return
+            plt.savefig(f'{basepath_fig}{any2filename(file)}.pdf',bbox_inches="tight")
         if closeQ:
             plt.close()
     
     def makePDF(file,figs):
-        pdf = PdfPages(file)
+        assert(basepath_fig is not None)
+        pdf = PdfPages(f'{basepath_fig}{any2filename(file)}.pdf')
         for fig in figs:
             pdf.savefig(fig,bbox_inches="tight")
         pdf.close()
@@ -916,6 +1047,7 @@ if True:
             return (eVals,eVecs_normalized,Zin)
 
         return (eVals,np.transpose(eVecs,[0,2,1]))
+
 #!============== ensemble info ==============#
 if True:
     ens2full={'a24':'cA211.53.24','a':'cA2.09.48','b':'cB211.072.64','c':'cC211.060.80','d':'cD211.054.96','e':'cE211.044.112'}
@@ -926,6 +1058,7 @@ if True:
 
     hbarc = 1/197.3
     ens2aInv={ens:1/(ens2a[ens]*hbarc) for ens in ens2a.keys()} # MeV
+
 #!============== obsolete  ==============#
 if False:
     app_init=[['pi0i',{'pib'}],['pi0f',{'pia'}],['j',{'j'}],['P',{'pia','pib'}],\
