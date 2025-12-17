@@ -1,17 +1,18 @@
-import os,h5py,warnings
+import os,h5py,warnings,pickle,functools
 import numpy as np
-np.seterr(invalid=['ignore','warn'][0])
-np.set_printoptions(legacy='1.25')
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import math,cmath
+from matplotlib.backends.backend_pdf import PdfPages
 from math import floor, log10
-import pickle
-import functools
 from scipy.optimize import leastsq, curve_fit, fsolve
 from scipy.linalg import solve_triangular,cholesky
 from inspect import signature
-from matplotlib.backends.backend_pdf import PdfPages
+from IPython.display import display,HTML
+
+np.seterr(invalid=['ignore','warn'][0])
+np.set_printoptions(legacy='1.25')
+
 mpl.style.use('default')
 mpl.rcParams['figure.facecolor'] = 'white'
 mpl.rcParams['figure.titlesize'] = 20
@@ -26,11 +27,11 @@ mpl.rcParams['xtick.labelsize'] = mpl.rcParams['ytick.labelsize'] = 22
 mpl.rcParams['xtick.major.size'] = mpl.rcParams['ytick.major.size'] = 10
 mpl.rcParams['xtick.top']=mpl.rcParams['ytick.right']=True
 mpl.rcParams['xtick.direction']=mpl.rcParams['ytick.direction']='in'
-mpl.rcParams['legend.fontsize'] = 24
+mpl.rcParams['legend.fontsize'] = 16
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["mathtext.fontset"] = "dejavuserif"
 
-__all__ = ['np','os','plt','h5py','pickle']
+__all__ = ['np','os','plt','h5py','pickle','pd','display']
 
 #!============== Initialization ==============#
 if True:
@@ -55,6 +56,7 @@ if True:
     deepKey=lambda dic,n: dic if n==0 else deepKey(dic[list(dic.keys())[0]],n-1)
     npRound=lambda dat,n:np.round(np.array(dat).astype(float),n)
     
+    # c2pt2meff=lambda c2pt:np.log(np.roll(c2pt,1,axis=0)/c2pt) # use this one should also change the definition for func_meff_nst
     c2pt2meff=lambda c2pt:np.log(c2pt/np.roll(c2pt,-1,axis=0))
     nvec2n2= lambda nvec:nvec[0]**2+nvec[1]**2+nvec[2]**2
     
@@ -69,6 +71,9 @@ if True:
             res=fsolve(func, x0)[0]
         return res if res!=x0 else np.NaN
     
+    cfg2old=lambda cfg: cfg[1:]+'_r'+{'a':'0','b':'1','c':'2','d':'3'}[cfg[0]]
+    cfg2new=lambda cfg: {'0':'a','1':'b','2':'c','3':'d'}[cfg[-1]] + cfg[:4]
+    
     def moms2dic(moms):
         dic={}
         for i,mom in enumerate(moms):
@@ -76,6 +81,10 @@ if True:
         return dic
     def moms2list(moms):
         return [list(mom) for mom in moms]
+    def mom2str(mom):
+        return ','.join([str(ele) for ele in mom])
+    def str2mom(momstr):
+        return [int(ele) for ele in momstr.split(',')]
     
     def decodeList(l):
         return [ele.decode() for ele in l]
@@ -87,24 +96,46 @@ if True:
             return ';'.join(t)
         1/0
     def save_pkl(file,res):
-        if basepath_pkl is None:
-            print('basepath_pkl is None')
-            return
-        with open(f'{basepath_pkl}{any2filename(file)}.pkl','wb') as f:
+        with open(file,'wb') as f:
             pickle.dump(res,f)
     def load_pkl(file):
+        with open(file,'rb') as f:
+            res=pickle.load(f)
+        return res
+    def save_pkl_internal(label,res):
         if basepath_pkl is None:
-            print('basepath_pkl is None')
-            return
+            print('basepath_pkl is None, stop saving')
+            return False
+        save_pkl(f'{basepath_pkl}{any2filename(label)}.pkl',res)
+        return True
+    def load_pkl_internal(file):
+        if basepath_pkl is None:
+            print('basepath_pkl is None, stop loading')
+            return None
         if not os.path.isfile(f'{basepath_pkl}{any2filename(file)}.pkl'):
             return None
-        with open(f'{basepath_pkl}{any2filename(file)}.pkl','rb') as f:
-            res=pickle.load(f)
+        res=load_pkl(f'{basepath_pkl}{any2filename(file)}.pkl')
         return res
     def clear_pkl(file):
         if os.path.isfile(f'{basepath_pkl}{any2filename(file)}.pkl'):
             os.remove(f'{basepath_pkl}{any2filename(file)}.pkl')
-     
+            
+    def lat_a2s2plt(lat_a2s,N=40):
+        a2max=np.max(lat_a2s)*1.2
+        return np.arange(0,a2max,a2max/N)
+    
+    def find_t_cloest(t,a):
+        return round(t/a)
+    
+    def removeError(dat):
+        t=np.mean(dat,axis=0)
+        return dat*0 + t[None,...]
+
+#!============== constants ==============#
+if True:
+    hbarc = 1/197.3
+    m_proton,m_neutron=938.2721,939.5654
+
 #!============== error analysis ==============#
 if True:
     def propagateError(func,mean,cov):
@@ -155,6 +186,13 @@ if True:
         dat_mean=np.mean(dat_jk,axis=0)
         dat_err=np.sqrt(np.var(dat_jk,axis=0,ddof=0)*(n-1))
         return (dat_mean,dat_err)
+    def jackme_un2str(dat_jk):
+        mean,err=jackme(dat_jk)
+        if len(dat_jk.shape)==1:
+            return un2str(mean,err)
+        elif len(dat_jk.shape)==2:
+            return [un2str(m,e) for m,e in zip(mean,err)]
+        1/0
     def jackmec(dat_jk):
         n=len(dat_jk)
         dat_mean=np.mean(dat_jk,axis=0)
@@ -374,57 +412,64 @@ if True:
         else:
             return result1
 
-#!============== fit ==============#
+#!============== fit (basic) ==============#
 if True:
     def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[],**kargs):
         '''
         priors=[(ind of par, mean, width)]
         '''
-        y_mean,_,y_cov=jackmec(y_jk)
-        if mask is not None:
-            if mask == 'uncorrelated':
-                y_cov=np.diag(np.diag(y_cov))
-            else:
-                y_cov=y_cov*mask
-            
-        cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True)) # y_cov^{-1}=cho_L_Inv^T@cho_L_Inv
-        if parsExtra_jk is None:
-            if len(priors)==0:
-                fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
-            else:
-                fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-        else:
-            parsExtra_mean=list(np.mean(parsExtra_jk,axis=0))
-            if len(priors)==0:
-                fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean)
-            else:
-                fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-        pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True,**kargs)[:2]
-        
-        if flag_fast == "FastFit": # Generate pseudo jackknife resamples from the single fit rather than doing lots of fits
-            n=len(y_jk)
-            pars_jk=jackknife_pseudo(pars_mean,pars_cov,n)
-        else:
+        with warnings.catch_warnings(record=True) as list_warnings:
+            warnings.simplefilter("always")
+
+            y_mean,_,y_cov=jackmec(y_jk)
+            if mask is not None:
+                if mask == 'uncorrelated':
+                    y_cov=np.diag(np.diag(y_cov))
+                else:
+                    y_cov=y_cov*mask
+                
+            cho_L_Inv = np.linalg.inv(cholesky(y_cov, lower=True)) # y_cov^{-1}=cho_L_Inv^T@cho_L_Inv
             if parsExtra_jk is None:
                 if len(priors)==0:
-                    def func(dat):
-                        fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
-                        pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
-                        return pars
+                    fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(pars)-y_mean)
                 else:
-                    def func(dat):
-                        fitfunc_wrapper2=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-dat),[(pars[ind]-mean)/width for ind,mean,width in priors]])
-                        pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
-                        return pars
-                pars_jk=jackmap(func,y_jk)
+                    fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
             else:
+                parsExtra_mean=list(np.mean(parsExtra_jk,axis=0))
                 if len(priors)==0:
-                    pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
+                    fitfunc_wrapper=lambda pars: cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean)
                 else:
-                    pars_jk=np.array([leastsq(lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
-        chi2_jk=np.array([[np.sum(fitfunc_wrapper(pars)**2)] for pars in pars_jk])
-        Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
-        return pars_jk,chi2_jk,Ndof
+                    fitfunc_wrapper=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+parsExtra_mean)-y_mean),[(pars[ind]-mean)/width for ind,mean,width in priors]])
+            pars_mean,pars_cov=leastsq(fitfunc_wrapper,pars0,full_output=True,**kargs)[:2]
+            
+            if flag_fast == "FastFit": # Generate pseudo jackknife resamples from the single fit rather than doing lots of fits
+                n=len(y_jk)
+                pars_jk=jackknife_pseudo(pars_mean,pars_cov,n)
+            else:
+                if parsExtra_jk is None:
+                    if len(priors)==0:
+                        def func(dat):
+                            fitfunc_wrapper2=lambda pars: cho_L_Inv@(fitfunc(pars)-dat)
+                            pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
+                            return pars
+                    else:
+                        def func(dat):
+                            fitfunc_wrapper2=lambda pars: np.concatenate([cho_L_Inv@(fitfunc(pars)-dat),[(pars[ind]-mean)/width for ind,mean,width in priors]])
+                            pars=leastsq(fitfunc_wrapper2,pars_mean,**kargs)[0]
+                            return pars
+                    pars_jk=jackmap(func,y_jk)
+                else:
+                    if len(priors)==0:
+                        pars_jk=np.array([leastsq(lambda pars: cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
+                    else:
+                        pars_jk=np.array([leastsq(lambda pars: np.concatenate([cho_L_Inv@(fitfunc(list(pars)+list(parsExtra))-y),[(pars[ind]-mean)/width for ind,mean,width in priors]]),pars_mean,**kargs)[0] for y,parsExtra in zip(y_jk,parsExtra_jk)])
+            chi2_jk=np.array([[np.sum(fitfunc_wrapper(pars)**2)] for pars in pars_jk])
+            Ndata=len(y_mean); Npar=len(pars0); Ndof=Ndata-Npar
+            
+            Nwarning = len(list_warnings)
+            for w in list_warnings:
+                warnings.showwarning(message=w.message,category=w.category,filename=w.filename,lineno=w.lineno,file=w.file,line=w.line)
+        return pars_jk,chi2_jk,Ndof,Nwarning
     
     def find_fitmax(dat,threshold=0.2):
         mean,err=jackme(dat)
@@ -439,13 +484,22 @@ if True:
             return y_jk,np.zeros(len(y_jk)),0
         def fitfunc(pars):
             return list(pars)*Ndata
-        pars_jk,chi2_jk,Ndof=jackfit(fitfunc,y_jk,[np.mean(y_jk)],mask=None if corrQ else 'uncorrelated')
+        pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,[np.mean(y_jk)],mask=None if corrQ else 'uncorrelated')
+        return pars_jk,chi2_jk,Ndof
+    
+    def doFit_linear(xs,y_jk,corrQ=True):
+        def fitfunc(pars):
+            c0,c1=pars
+            return c1*xs+c0
+        pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,[np.mean(y_jk),0],mask=None if corrQ else 'uncorrelated')
         return pars_jk,chi2_jk,Ndof
     
     def fits2text(fits):
         text=[]
         pars_jk,props_jk=jackMA(fits)
-        means,errs=jackme(pars_jk)
+        Npar=pars_jk.shape[1]
+        Ncut=Npar if Npar<20 else 1
+        means,errs=jackme(pars_jk[:,:Ncut])
         props_mean,props_err=jackme(props_jk)
         ind_mpf=np.argmax(props_mean)
         fitlabel,pars_jk,chi2_jk,Ndof = fits[ind_mpf]
@@ -453,21 +507,46 @@ if True:
         text.append(f'Model average: pars={[un2str(mean,err) for mean,err in zip(means,errs)]}, most probable fitlabel: {fits[ind_mpf][0]}, prop={int(props_mean[ind_mpf]*100)}%, chi2/Ndof={int(chi2*10)/10}/{Ndof}={int(chi2/Ndof*10)/10};')
         for i,fit in enumerate(fits):
             fitlabel,pars_jk,chi2_jk,Ndof = fit
-            means,errs=jackme(pars_jk); mean_chi2,err_chi2=jackme(chi2_jk)
+            means,errs=jackme(pars_jk[:,:Ncut]); mean_chi2,err_chi2=jackme(chi2_jk)
             text.append(f'fitlabel={fitlabel}, pars={[un2str(mean,err) for mean,err in zip(means,errs)]}, prop={int(props_mean[i]*100)}%, chi2/Ndof={int(mean_chi2[0]*10)/10}/{Ndof}={int(mean_chi2[0]/Ndof*10)/10};')
         return text
-        
+    
+    def decorator_fits(func):
+        @functools.wraps(func)
+        def wrapper(*args, label=None, overwrite=False, **kwargs):
+            if label=='test':
+                overwrite=True
+            if label is not None and not overwrite:
+                res=load_pkl_internal(label)
+                if res is not None:
+                    return res
+            res = func(*args, **kwargs)
+            if label is not None:
+                if save_pkl_internal(label,res):
+                    text=fits2text(res)
+                    with open(f'{basepath_pkl}{any2filename(label)}.txt','w') as f:
+                        f.write('\n'.join(text))
+            return res
+        return wrapper
+    
+    def clear_test():
+        assert(basepath_pkl is not None)
+        files=[file for file in os.listdir(basepath_pkl) if file.startswith('test')]
+        for file in files:
+            os.remove(f'{basepath_pkl}{file}')
+            print(f'{basepath_pkl}{file} removed')
+    
     # def decorator_fits(TYPE='fits'):
     #     def decorator(func):
     #         @functools.wraps(func)
     #         def wrapper(*args, label=None, overwrite=False, **kwargs):
     #             if label is not None and not overwrite:
-    #                 res=load_pkl(label)
+    #                 res=load_pkl_internal(label)
     #                 if res is not None:
     #                     return res
     #             res = func(*args, **kwargs)
     #             if label is not None:
-    #                 save_pkl(label,res)
+    #                 save_pkl_internal(label,res)
     #                 if TYPE is not None:
     #                     if TYPE=='fits':
     #                         text=fits2text(res)
@@ -482,45 +561,48 @@ if True:
     #             return res
     #         return wrapper
     #     return decorator
-    
-    def decorator_fits(func):
-        @functools.wraps(func)
-        def wrapper(*args, label=None, overwrite=False, **kwargs):
-            if label is not None and not overwrite:
-                res=load_pkl(label)
-                if res is not None:
-                    return res
-            res = func(*args, **kwargs)
-            if label is not None:
-                save_pkl(label,res)
-                text=fits2text(res)
-                with open(f'{basepath_pkl}{any2filename(label)}.txt','w') as f:
-                    f.write('\n'.join(text))
-            return res
-        return wrapper
+
+    @decorator_fits
+    def doFit_continuumExtrapolation(dat,lat_a2s,lat_a2s_plt=None):
+        t=superjackknife(dat)
+        fits=[]
+        fitlabel='const'
+        pars_jk,chi2_jk,Ndof=doFit_const(t)
+        if lat_a2s_plt is not None:
+            pars_jk=np.array([0*np.array(lat_a2s_plt)+pars[0] for pars in pars_jk])
+        fits.append([fitlabel,pars_jk,chi2_jk,Ndof])
+        fitlabel='linear'
+        pars_jk,chi2_jk,Ndof=doFit_linear(np.array(lat_a2s),t)
+        if lat_a2s_plt is not None:
+            pars_jk=np.array([pars[1]*np.array(lat_a2s_plt)+pars[0] for pars in pars_jk])
+        fits.append([fitlabel,pars_jk,chi2_jk,Ndof])
+        return fits
+#!============== fit (2pt) ==============#
+if True:
     def decorator_fits_2pt(func):
         @functools.wraps(func)
         def wrapper(*args, label=None, overwrite=False, **kwargs):
+            if label=='test':
+                overwrite=True
             if label is not None and not overwrite:
-                res=load_pkl(label)
+                res=load_pkl_internal(label)
                 if res is not None:
                     return res
             res = func(*args, **kwargs)
             if label is not None:
-                save_pkl(label,res)
-                text=[]
-                for i,fits in enumerate(res):
-                    text.append(f'{i+1} state fit')
-                    text+=fits2text(fits)
-                    text.append('\n')
-                with open(f'{basepath_pkl}{any2filename(label)}.txt','w') as f:
-                    f.write('\n'.join(text))
+                if save_pkl_internal(label,res):
+                    text=[]
+                    for i,fits in enumerate(res):
+                        text.append(f'{i+1} state fit')
+                        text+=fits2text(fits)
+                        text.append('\n')
+                    with open(f'{basepath_pkl}{any2filename(label)}.txt','w') as f:
+                        f.write('\n'.join(text))
             return res
         return wrapper
     
-
     @decorator_fits
-    def doFit_2pt(dat,tmins,func,pars0,downSampling=1,corrQ=True):
+    def doFit_2pt(dat,tmins,func,pars0,downSampling=1,corrQ=True,debugQ=False):
         tmax=find_fitmax(dat)
         fits=[]
         for tmin in tmins:
@@ -528,7 +610,9 @@ if True:
             def fitfunc(pars):
                 return func(ts,*pars)
             y_jk=dat[:,ts]
-            pars_jk,chi2_jk,Ndof=jackfit(fitfunc,y_jk,pars0,mask=None if corrQ else 'uncorrelated')
+            pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,pars0,mask=None if corrQ else 'uncorrelated')
+            if Nwarning or debugQ:
+                print(f'[Nwarning={Nwarning}] Npar={len(pars0)}, tmin={tmin}')
             pars0=np.mean(pars_jk,axis=0)
             fits.append([tmin,pars_jk,chi2_jk,Ndof])
         return fits
@@ -540,49 +624,69 @@ if True:
     func_meff_2st=lambda t,E0,dE1,rc1: np.log(func_c2pt_2st(t,E0,1,dE1,rc1)/func_c2pt_2st(t+1,E0,1,dE1,rc1))
     func_meff_3st=lambda t,E0,dE1,rc1,dE2,rc2: np.log(func_c2pt_3st(t,E0,1,dE1,rc1,dE2,rc2)/func_c2pt_3st(t+1,E0,1,dE1,rc1,dE2,rc2))
     @decorator_fits_2pt
-    def doFit_meff_nst(meff,tminss,pars0,downSampling=1,corrQ=True):
+    def doFit_meff_nst(meff,tminss,pars0,downSampling=1,corrQ=True,debugQ=False):
         Nst=len(tminss)
-        fits_1st=doFit_2pt(meff,tminss[0],func_meff_1st,pars0[:1],downSampling=downSampling,corrQ=corrQ)
+        fits_1st=doFit_2pt(meff,tminss[0],func_meff_1st,pars0[:1],downSampling=downSampling,corrQ=corrQ,debugQ=debugQ)
         if Nst==1:
             return [fits_1st]
         
         pars_jk,props_jk=jackMA(fits_1st)
         pars0[:1]=np.mean(pars_jk,axis=0)
-        fits_2st=doFit_2pt(meff,tminss[1],func_meff_2st,pars0[:3],downSampling=downSampling,corrQ=corrQ)
+        fits_2st=doFit_2pt(meff,tminss[1],func_meff_2st,pars0[:3],downSampling=downSampling,corrQ=corrQ,debugQ=debugQ)
         if Nst==2:
             return [fits_1st,fits_2st]
         
         pars_jk,props_jk=jackMA(fits_2st)
         pars0[:3]=np.mean(pars_jk,axis=0)
-        fits_3st=doFit_2pt(meff,tminss[2],func_meff_3st,pars0[:5],downSampling=downSampling,corrQ=corrQ)
+        fits_3st=doFit_2pt(meff,tminss[2],func_meff_3st,pars0[:5],downSampling=downSampling,corrQ=corrQ,debugQ=debugQ)
         if Nst==3:
             return [fits_1st,fits_2st,fits_3st]
-    
+#!============== fit (3pt) ==============#
+if True:
     @decorator_fits
-    def doFit_3ptSym_1st(tf2ratio_para,tfmins,tcmins,pars0=None,downSampling=[1,1],symmetrizeQ=False,corrQ=True):
+    def doFit_3pt_1st(tf2ratio_para,tfmins,tcmins,pars0=None,downSampling=[1,1],symmetrizeQ=False,corrQ=True):
         tf2ratio=tf2ratio_para.copy()
         tfs=list(tf2ratio.keys()); tfs.sort()
         if symmetrizeQ:
             symmetrizeRatio(tf2ratio)
         if pars0 is None:
-            tfmax=np.max(tfs)
-            g=np.mean(tf2ratio[tfmax][:,tfmax//2])
+            tfmin=np.min(tfs)
+            g=np.mean(tf2ratio[tfmin][:,tfmin//2])
             pars0=[g]
-        
         fits=[]
         for tfmin in tfmins:
             for tcmin in tcmins:
                 if tfmin<tcmin*2:
                     continue
-                
                 tfs_fit=[tf for tf in tfs if tfmin<=tf and tf%downSampling[0]==tfmin%downSampling[0]]
                 tf2tcs_fit={tf:np.arange(tcmin,tf//2+1,downSampling[1]) if symmetrizeQ else np.arange(tcmin,tf-tcmin+1,downSampling[1])  for tf in tfs_fit}
-                
                 y_jk=np.concatenate([tf2ratio[tf][:,tf2tcs_fit[tf]] for tf in tfs_fit],axis=1)
                 Ndata=y_jk.shape[1]
                 def fitfunc(pars):
                     return list(pars)*Ndata
-                pars_jk,chi2_jk,Ndof=jackfit(fitfunc,y_jk,pars0,mask=None if corrQ else 'uncorrelated')
+                pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,pars0,mask=None if corrQ else 'uncorrelated')
+                fits.append([(tfmin,tcmin),pars_jk,chi2_jk,Ndof])
+        return fits
+    
+    @decorator_fits
+    def doFit_3pt_sum(tf2ratio,tfmins,tcmins,pars0=None,downSampling=1,corrQ=True):
+        tfs=list(tf2ratio.keys()); tfs.sort()
+        if pars0 is None:
+            tfmin=np.min(tfs)
+            g=np.mean(tf2ratio[tfmin][:,tfmin//2])
+            pars0=[g,0]
+        fits=[]
+        for tfmin in tfmins:
+            for tcmin in tcmins:
+                if tfmin<tcmin*2:
+                    continue
+                tfs_fit=[tf for tf in tfs if tfmin<=tf and tf%downSampling==tfmin%downSampling]
+                y_jk=np.transpose([np.sum(tf2ratio[tf][:,tcmin:tf+1-tcmin],axis=1) for tf in tfs_fit])
+                def fitfunc(pars):
+                    g,c=pars
+                    t=np.array([g*tf+c for tf in tfs_fit])
+                    return t
+                pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,pars0,mask=None if corrQ else 'uncorrelated')
                 fits.append([(tfmin,tcmin),pars_jk,chi2_jk,Ndof])
         return fits
         
@@ -590,15 +694,15 @@ if True:
         if a00!=0 else np.exp(-E0a*(tf-tc))*np.exp(-E0b*tc)*(ra01*np.exp(-dE1b*tc) + ra10*np.exp(-dE1a*(tf-tc)) + ra11*np.exp(-dE1a*(tf-tc))*np.exp(-dE1b*tc))
     func_ratio_2st=lambda tf,tc,g,dE1,rc1,ra01,ra11:func_c3pt_2st(tf,tc,0,0,g,dE1,dE1,ra01,ra01,ra11)/func_c2pt_2st(tf,0,1,dE1,rc1)
     @decorator_fits
-    def doFit_3ptSym_2st2step(tf2ratio_para,tfmins,tcmins,pars_jk_meff2st,pars0=None,downSampling=[1,1],symmetrizeQ=False,corrQ=True):
+    def doFit_3ptSym_2st2step(tf2ratio_para,tfmins,tcmins,pars_jk_meff2st,pars0=None,downSampling=[1,1],symmetrizeQ=False,corrQ=True,debugQ=False):
         tf2ratio=tf2ratio_para.copy()
         tfs=list(tf2ratio.keys()); tfs.sort()
         if symmetrizeQ:
             for tf in tfs:
                 tf2ratio[tf]=(tf2ratio[tf]+tf2ratio[tf][:,::-1])/2
         if pars0 is None:
-            tfmax=np.max(tfs)
-            g=np.mean(tf2ratio[tfmax][:,tfmax//2])
+            tfmin=np.min(tfs)
+            g=np.mean(tf2ratio[tfmin][:,tfmin//2])
             pars0=[g,0,0]
         
         fits=[]
@@ -615,11 +719,38 @@ if True:
                     g,ra01,ra11, E0,dE1,rc1=pars
                     t=np.concatenate([func_ratio_2st(tf,tf2tcs_fit[tf],g,dE1,rc1,ra01,ra11) for tf in tfs_fit])
                     return t
-                pars_jk,chi2_jk,Ndof=jackfit(fitfunc,y_jk,pars0,parsExtra_jk=pars_jk_meff2st,mask=None if corrQ else 'uncorrelated')
+                pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,pars0,parsExtra_jk=pars_jk_meff2st,mask=None if corrQ else 'uncorrelated')
+                if Nwarning or debugQ:
+                    print(f'[Nwarning={Nwarning}] tfmin={tfmin}, tcmin={tcmin}')
                 fits.append([(tfmin,tcmin),pars_jk,chi2_jk,Ndof])
         return fits
 
-#!============== plot ==============#
+#!============== table ==============#
+if True:
+    def dfs2html(dfs,titles=None):
+        if type(dfs)==pd.core.frame.DataFrame:
+            dfs=[dfs]; titles=[titles]
+        if titles is None:
+            titles=[None]*len(dfs)
+        
+        blocks = []
+        for df,title in zip(dfs,titles):
+            blocks.append(f"""
+                <div>
+                    <h3 style="text-align:center;">{title}</h3>
+                    {df.to_html()}
+                </div>
+            """)
+
+        html = f"""
+        <div style="display:flex; gap:20px;">
+            {''.join(blocks)}
+        </div>
+        """
+
+        return HTML(html)
+
+#!============== plot (basic) ==============#
 if True:
     colors8=['r','g','b','orange','purple','brown','magenta','olive']
     fmts8=['s','o','d','^','v','<','>','*']
@@ -648,6 +779,10 @@ if True:
         for ax, col in zip(axs[0,:], cols):
             ax.annotate(col, xy=(0.5, 1), xytext=(0, pad),
                     xycoords='axes fraction', textcoords='offset points', ha='center', va='baseline', fontsize=fontsize, **kargs)
+            
+    def addRefLine(ax,val,hv='h',color='grey',ls='--',marker='',label=None):
+        axline={'h':ax.axhline,'v':ax.axvline}[hv]
+        axline(val,color=color,ls=ls,marker=marker,label=label)
 
     def finalizePlot(file=None,closeQ=None):
         if closeQ is None:
@@ -677,146 +812,264 @@ if True:
         if xticklabels is not None:
             ax.set_xticklabels(xticklabels)
         return fig,axs
+    
+    def makePlot_continuumExtrapolation(matrix_dat,lat_a2s,lat_a2s_plt,matrix_fits,shows=['MA'],multiRowColQ=(False,False)):
+        matrix_dat,matrix_fits={
+            (False,False):([[matrix_dat]],[[matrix_fits]]),
+            (False,True):([matrix_dat],[matrix_fits]),
+            (True,False):([[dat] for dat in matrix_dat],[[fits] for fits in matrix_fits]),
+            (True,True):(matrix_dat,matrix_fits),
+        }[multiRowColQ]
+        
+        Nrow,Ncol=len(matrix_dat),len(matrix_dat[0])
+        fig,axs=getFigAxs(Nrow,Ncol,sharex='col',sharey='row')
+        for icol in range(Ncol):
+            ax=axs[-1,icol]
+            ax.set_xlabel(r'$a^2$ [fm$^2$]')
             
-    def makePlot_2pt_SimoneStyle(meff,fitss,xunit=1,yunit=1,mN_exp=None):
-        fig, axd = plt.subplot_mosaic([['f1','f1','f1'],['f2','f2','f3']],figsize=(24,10))
-        (ax1,ax2,ax3)=(axd[key] for key in ['f1','f2','f3'])
-        ax1.set_xlabel(r'$t$ [fm]')
-        ax2.set_xlabel(r'$t_{\mathrm{min}}$ [fm]')
-        ax3.set_xlabel(r'$t_{\mathrm{min}}$ [fm]')
-        ax1.set_ylabel(r'$m_N^{\mathrm{eff}}$ [GeV]')
-        ax2.set_ylabel(r'$m_N$ [GeV]')
-        ax3.set_ylabel(r'$E_1$ [GeV]')
+        for irow in range(Nrow):
+            for icol in range(Ncol):
+                ax=axs[irow,icol]
+                dat=matrix_dat[irow][icol]; fits=matrix_fits[irow][icol]
 
-        mean,err=jackme(meff)
-        fitmax=find_fitmax(meff)
-        
-        tmin=1; tmax=fitmax+1
-        plt_x=np.arange(tmin,tmax)*xunit; plt_y=mean[tmin:tmax]*yunit; plt_yerr=err[tmin:tmax]*yunit
-        ax1.errorbar(plt_x,plt_y,plt_yerr,color='black',fmt='s')
-        
-        if mN_exp is not None:
-            ax1.axhline(y=mN_exp,color='black',linestyle = '--', marker='')
-            ax2.axhline(y=mN_exp,color='black',linestyle = '--', marker='', label=r'$m_N^{\mathrm{exp}}=$'+'%0.3f'%mN_exp)
-        
-        Nst=len(fitss)
-        propThreshold=0.1
-        chi2Size=12
-        DNpar=1 # DNpar=1 if meffQ else 0
-        percentage_shiftMultiplier=1.5
-        
-        if Nst==0:
-            return fig,axd
-        
-        color='r'
-        fits=fitss[0]    
-        fitmins=[fit[0] for fit in fits]
-        pars_jk,props_jk=jackMA(fits)
-        props_mean=np.mean(props_jk,axis=0)
-        ind_mpf=np.argmax(np.mean(props_jk,axis=0))    
-        pars_mean,pars_err=jackme(pars_jk)
-        plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
-        ax2.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2,label=r'$m_N^{\mathrm{1st}}=$'+un2str(plt_y,plt_yerr))
-        ax1.set_ylim([plt_y-plt_yerr*20,plt_y+plt_yerr*40])
-        ax2.set_ylim([plt_y-plt_yerr*20,plt_y+plt_yerr*30])
-        for i,fit in enumerate(fits):
-            fitmin,pars_jk,chi2_jk,Ndof=fit; prop=props_mean[i]
-            (pars_mean,pars_err)=jackme(pars_jk)
-            chi2R=np.mean(chi2_jk)/Ndof
-            showQ = i==ind_mpf if propThreshold is None else prop>propThreshold
-            
-            plt_x=fitmin*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
-            ax2.errorbar(plt_x,plt_y,plt_yerr,fmt='s',color=color,mfc='white' if showQ else None)
-            ylim=ax2.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
-            ax2.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
-            if propThreshold is not None and prop>propThreshold:
-                ax2.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
-            
-        if Nst==1:
-            return fig,axd
-        
-        color='g'
-        fits=fitss[1]    
-        fitmins=[fit[0] for fit in fits]
-        pars_jk,props_jk=jackMA(fits)
-        props_mean=np.mean(props_jk,axis=0)
-        ind_mpf=np.argmax(np.mean(props_jk,axis=0)) 
-        t=pars_jk.copy()
-        t[:,1]=pars_jk[:,0]+pars_jk[:,2-DNpar]
-        pars_mean,pars_err=jackme(t)
-        plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
-        ax2.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$m_N^{\mathrm{2st}}=$'+un2str(plt_y,plt_yerr))
-        plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
-        ax3.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$E_1^{\mathrm{2st}}=$'+un2str(plt_y,plt_yerr))
-        ax3.set_ylim([plt_y-plt_yerr*20,plt_y+plt_yerr*30])
-        for i,fit in enumerate(fits):
-            fitmin,pars_jk,chi2_jk,Ndof=fit; prop=props_mean[i]
-            t=pars_jk.copy()
-            t[:,1]=pars_jk[:,0]+pars_jk[:,2-DNpar]
-            (pars_mean,pars_err)=jackme(t)
-            chi2R=np.mean(chi2_jk)/Ndof
-            showQ = i==ind_mpf if propThreshold is None else prop>propThreshold
-            
-            plt_x=fitmin*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
-            ax2.errorbar(plt_x,plt_y,plt_yerr,fmt='o',color=color,mfc='white' if showQ else None)
-            ylim=ax2.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
-            ax2.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
-            if propThreshold is not None and prop>propThreshold:
-                ax2.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
-            
-            plt_x=fitmin*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
-            ax3.errorbar(plt_x,plt_y,plt_yerr,fmt='o',color=color,mfc='white' if showQ else None)
-            ylim=ax3.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
-            ax3.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
-            if propThreshold is not None and prop>propThreshold:
-                ax3.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
+                mes=[jackme(ele) for ele in dat]
+                plt_x=np.array(lat_a2s); plt_y=[me[0][0] for me in mes]; plt_yerr=[me[1][0] for me in mes]
+                ax.errorbar(plt_x,plt_y,plt_yerr,color='g')
+                
+                colors={'const':'r','linear':'b','MA':'orange'}
+                
+                for fit in fits:
+                    fitlabel,pars_jk,chi2_jk,Ndof=fit
+                    if fitlabel not in shows:
+                        continue
+                    mean,err=jackme(pars_jk)
+                    x=np.array(lat_a2s_plt); ymin=mean-err; ymax=mean+err
+                    ax.plot(x,mean,color=colors[fitlabel],linestyle='--',marker='')
+                    ax.fill_between(x, ymin, ymax, color=colors[fitlabel], alpha=0.1,label=f'{fitlabel}={un2str(mean[0],err[0])}')
+                for fitlabel in ['MA']:
+                    if fitlabel not in shows:
+                        continue
+                    pars_jk,props_jk=jackMA(fits)
+                    mean,err=jackme(pars_jk)
+                    x=np.array(lat_a2s_plt); ymin=mean-err; ymax=mean+err
+                    ax.plot(x,mean,color=colors[fitlabel],linestyle='--',marker='')
+                    ax.fill_between(x, ymin, ymax, color=colors[fitlabel], alpha=0.1,label=f'{fitlabel}={un2str(mean[0],err[0])}')
+                
+                ax.legend(fontsize=16)
+        return fig,axs
+#!============== plot (2pt) ==============#
+if True:
+    def makePlot_2pt_SimoneStyle(meff,fitss,xunit=1,yunit=1,mN_exp=None,selection={},ylims='auto'):
+        for _ in [0]:
+            result={}
+            fig, axd = plt.subplot_mosaic([['f1','f1','f1'],['f2','f2','f3']],figsize=(24,10))
+            (ax1,ax2,ax3)=(axd[key] for key in ['f1','f2','f3'])
+            ax1.set_xlabel(r'$t$ [fm]')
+            ax2.set_xlabel(r'$t_{\mathrm{min}}$ [fm]')
+            ax3.set_xlabel(r'$t_{\mathrm{min}}$ [fm]')
+            ax1.set_ylabel(r'$m_N^{\mathrm{eff}}$ [GeV]')
+            ax2.set_ylabel(r'$m_N$ [GeV]')
+            ax3.set_ylabel(r'$E_1$ [GeV]')
+            if ylims=='std_N':
+                ylims=[[0.86,1.11],[0.86,1.11],[0,3.9]]
+            if ylims!='auto':
+                ax1.set_ylim(ylims[0]); ax2.set_ylim(ylims[1]); ax3.set_ylim(ylims[2])
 
-        if Nst==2:
+            mean,err=jackme(meff)
+            fitmax=find_fitmax(meff)
+            
+            tmin=1; tmax=fitmax+1
+            plt_x=np.arange(tmin,tmax)*xunit; plt_y=mean[tmin:tmax]*yunit; plt_yerr=err[tmin:tmax]*yunit
+            ax1.errorbar(plt_x,plt_y,plt_yerr,color='black',fmt='s')
+            
             if mN_exp is not None:
-                ax2.legend(fontsize=16)
-            return fig,axd
+                ax1.axhline(y=mN_exp,color='black',linestyle = '--', marker='')
+                ax2.axhline(y=mN_exp,color='black',linestyle = '--', marker='', label=r'$m_N^{\mathrm{exp}}=$'+'%0.3f'%mN_exp)
+            
+            Nst=len(fitss)
+            propThreshold=0.1
+            chi2Size=12
+            DNpar=1 # DNpar=1 if meffQ else 0
+            percentage_shiftMultiplier=1.5
+            
+            if Nst==0:
+                continue
+            
+            fitcase='1st'
+            color='r'
+            fits=fitss[0]    
+            fitmins=[fit[0] for fit in fits]
+            pars_jk,props_jk=jackMA(fits)
+            props_mean=np.mean(props_jk,axis=0)
+            ind_mpf=np.argmax(np.mean(props_jk,axis=0))  
+            if fitcase in selection:
+                ind_select=fitmins.index(selection[fitcase])
+                result[fitcase]=fits[ind_select][1]
+            else:
+                result[fitcase]=pars_jk
+            pars_mean,pars_err=jackme(result[fitcase])
+            plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
+            ax2.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2,label=r'$m_N^{\mathrm{1st}}=$'+un2str(plt_y,plt_yerr))
+            if ylims=='auto':
+                ax1.set_ylim([plt_y-plt_yerr*20,plt_y+plt_yerr*40])
+                ax2.set_ylim([plt_y-plt_yerr*20,plt_y+plt_yerr*30])
+            for i,fit in enumerate(fits):
+                fitmin,pars_jk,chi2_jk,Ndof=fit; prop=props_mean[i]
+                (pars_mean,pars_err)=jackme(pars_jk)
+                chi2R=np.mean(chi2_jk)/Ndof
+                if fitcase in selection:
+                    showQ = i==ind_select
+                else:
+                    showQ = i==ind_mpf if propThreshold is None else prop>propThreshold
+                plt_x=fitmin*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
+                ax2.errorbar(plt_x,plt_y,plt_yerr,fmt='s',color=color,mfc='white' if showQ else None)
+                ylim=ax2.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
+                ax2.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
+                if propThreshold is not None and prop>propThreshold:
+                    ax2.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
+            
+            if Nst==1:
+                continue
+            
+            fitcase='2st'
+            color='g'
+            fits=fitss[1]    
+            fitmins=[fit[0] for fit in fits]
+            pars_jk,props_jk=jackMA(fits)
+            props_mean=np.mean(props_jk,axis=0)
+            ind_mpf=np.argmax(np.mean(props_jk,axis=0)) 
+            if fitcase in selection:
+                ind_select=fitmins.index(selection[fitcase])
+                result[fitcase]=fits[ind_select][1]
+            else:
+                result[fitcase]=pars_jk
+            t=np.transpose([result[fitcase][:,0],result[fitcase][:,0]+result[fitcase][:,2-DNpar]])
+            pars_mean,pars_err=jackme(t)
+            plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
+            ax2.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$m_N^{\mathrm{2st}}=$'+un2str(plt_y,plt_yerr))
+            plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
+            ax3.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$E_1^{\mathrm{2st}}=$'+un2str(plt_y,plt_yerr))
+            if ylims=='auto':
+                ax3.set_ylim([plt_y-plt_yerr*20,plt_y+plt_yerr*30])
+            for i,fit in enumerate(fits):
+                fitmin,pars_jk,chi2_jk,Ndof=fit; prop=props_mean[i]
+                t=pars_jk.copy()
+                t[:,1]=pars_jk[:,0]+pars_jk[:,2-DNpar]
+                (pars_mean,pars_err)=jackme(t)
+                chi2R=np.mean(chi2_jk)/Ndof
+                if fitcase in selection:
+                    showQ = i==ind_select
+                else:
+                    showQ = i==ind_mpf if propThreshold is None else prop>propThreshold
+                plt_x=fitmin*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
+                ax2.errorbar(plt_x,plt_y,plt_yerr,fmt='o',color=color,mfc='white' if showQ else None)
+                ylim=ax2.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
+                ax2.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
+                if propThreshold is not None and prop>propThreshold:
+                    ax2.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
+                
+                plt_x=fitmin*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
+                ax3.errorbar(plt_x,plt_y,plt_yerr,fmt='o',color=color,mfc='white' if showQ else None)
+                ylim=ax3.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
+                ax3.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
+                if propThreshold is not None and prop>propThreshold:
+                    ax3.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
+                    
+            if Nst==2:
+                continue
+            
+            fitcase='3st'
+            color='b'
+            fits=fitss[2]    
+            fitmins=[fit[0] for fit in fits]
+            pars_jk,props_jk=jackMA(fits)
+            props_mean=np.mean(props_jk,axis=0)
+            ind_mpf=np.argmax(np.mean(props_jk,axis=0))    
+            if fitcase in selection:
+                ind_select=fitmins.index(selection[fitcase])
+                result[fitcase]=fits[ind_select][1]
+            else:
+                result[fitcase]=pars_jk
+            t=np.transpose([result[fitcase][:,0],result[fitcase][:,0]+result[fitcase][:,2-DNpar]])
+            pars_mean,pars_err=jackme(t)
+            plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
+            ax2.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$m_N^{\mathrm{3st}}=$'+un2str(plt_y,plt_yerr))
+            plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
+            ax3.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$E_1^{\mathrm{3st}}=$'+un2str(plt_y,plt_yerr))    
+            for i,fit in enumerate(fits):
+                fitmin,pars_jk,chi2_jk,Ndof=fit; prop=props_mean[i]
+                t=pars_jk.copy()
+                t[:,1]=pars_jk[:,0]+pars_jk[:,2-DNpar]
+                (pars_mean,pars_err)=jackme(t)
+                chi2R=np.mean(chi2_jk)/Ndof
+                if fitcase in selection:
+                    showQ = i==ind_select
+                else:
+                    showQ = i==ind_mpf if propThreshold is None else prop>propThreshold
+                plt_x=fitmin*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
+                ax2.errorbar(plt_x,plt_y,plt_yerr,fmt='d',color=color,mfc='white' if showQ else None)
+                ylim=ax2.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
+                ax2.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
+                if propThreshold is not None and prop>propThreshold:
+                    ax2.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
+                
+                plt_x=fitmin*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
+                ax3.errorbar(plt_x,plt_y,plt_yerr,fmt='d',color=color,mfc='white' if showQ else None)
+                ylim=ax3.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
+                ax3.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center') 
+                if propThreshold is not None and prop>propThreshold:
+                    ax3.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
         
-        color='b'
-        fits=fitss[2]    
-        fitmins=[fit[0] for fit in fits]
-        pars_jk,props_jk=jackMA(fits)
-        props_mean=np.mean(props_jk,axis=0)
-        ind_mpf=np.argmax(np.mean(props_jk,axis=0))    
-        t=pars_jk.copy()
-        t[:,1]=pars_jk[:,0]+pars_jk[:,2-DNpar]
-        pars_mean,pars_err=jackme(t)
-        plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
-        ax2.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$m_N^{\mathrm{3st}}=$'+un2str(plt_y,plt_yerr))
-        plt_x=np.array([fitmins[0]-0.5,fitmins[-1]+0.5])*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
-        ax3.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=color,alpha=0.2, label=r'$E_1^{\mathrm{3st}}=$'+un2str(plt_y,plt_yerr))    
-        for i,fit in enumerate(fits):
-            fitmin,pars_jk,chi2_jk,Ndof=fit; prop=props_mean[i]
-            t=pars_jk.copy()
-            t[:,1]=pars_jk[:,0]+pars_jk[:,2-DNpar]
-            (pars_mean,pars_err)=jackme(t)
-            chi2R=np.mean(chi2_jk)/Ndof
-            showQ = i==ind_mpf if propThreshold is None else prop>propThreshold
-            
-            plt_x=fitmin*xunit; plt_y=pars_mean[0]*yunit; plt_yerr=pars_err[0]*yunit
-            ax2.errorbar(plt_x,plt_y,plt_yerr,fmt='d',color=color,mfc='white' if showQ else None)
-            ylim=ax2.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
-            ax2.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center')
-            if propThreshold is not None and prop>propThreshold:
-                ax2.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
-            
-            plt_x=fitmin*xunit; plt_y=pars_mean[1]*yunit; plt_yerr=pars_err[1]*yunit
-            ax3.errorbar(plt_x,plt_y,plt_yerr,fmt='d',color=color,mfc='white' if showQ else None)
-            ylim=ax3.get_ylim(); chi2_shift=(ylim[1]-ylim[0])/12
-            ax3.annotate("%0.1f" %chi2R,(plt_x,plt_y-plt_yerr-chi2_shift),color=color,size=chi2Size,ha='center') 
-            if propThreshold is not None and prop>propThreshold:
-                ax3.annotate(f"{int(prop*100)}%",(plt_x,plt_y-plt_yerr-chi2_shift*percentage_shiftMultiplier),color=color,size=chi2Size,ha='center')
-            
-        if Nst==3:
-            if mN_exp is not None:
-                ax2.legend(fontsize=16)
-            return fig,axd      
+        ax2.legend(fontsize=16)
+        ax3.legend(fontsize=16)
+        return fig,axd,result           
+#!============== plot (3pt) ==============#
+if True:
+    # def makePlot_3pt(list_tf2ratio,list_key2fits,keys,xunit=1,yunit=1,tcmin_rainbow=1,ylabels=None,key2para={}):
+    #     pass
         
-    def makePlot_3pt_ChristosStyle(list_tf2ratio_fits,xunit=1,yunit=1,tcmin_rainbow=1,ylabels=None):
+    # def makePlot_3pt(list_key2vals,keys,xunit=1,yunit=1,tcmin_rainbow=1,ylabels=None,key2para={}):
+    #     width_ratios=[3 if key in ['rainbow'] else 2 for key in keys]
+    #     Nrow=len(list_key2vals); Ncol=len(keys)
+    #     fig, axs = getFigAxs(Nrow,Ncol,Lrow=4,Lcol=6,sharex='col',sharey='row', gridspec_kw={'width_ratios': width_ratios})
+        
+    #     key2xlabel={'rainbow':r'$t_{\rm ins}-t_{s}/2$ [fm]','mid':r'$t_{s}^{\rm}$ [fm]','wing fit':r'$t_{s}^{\rm}$ [fm]',
+    #                 '1st fit':r'$t_{s}^{\rm low}$ [fm]', '2st fit':r'$t_{s}^{\rm low}$ [fm]', 'sum fit':r'$t_{s}^{\rm low}$ [fm]',
+    #                 'fit prop':r'Fit Prob.'}
+    #     irow=-1
+    #     for i,key in enumerate(keys):
+    #         axs[irow,i].set_xlabel(key2xlabel[key])
+        
+    #     key='rainbow'
+    #     if key in keys:
+    #         ind=keys.index(key)
+    #         basekey='tf2ratio'
+    #         for irow in range(Nrow):
+    #             tf2ratio=list_key2vals[irow][basekey]
+    #             tfs=list(tf2ratio.keys()); tfs.sort()
+    #             tfs_rainbow=[tf for tf in tfs if tf%2==0 and tf>=2*tcmin_rainbow]
+    #             if key in key2para:
+    #                 if 'tfmax' in key2para[key]:
+    #                     tfs_rainbow=[tf for tf in tfs_rainbow if tf<=key2para[key]['tfmax']]
+    #                 if 'tfmaxs' in key2para[key]:
+    #                     tfs_rainbow=[tf for tf in tfs_rainbow if tf<=key2para[key]['tfmaxs'][irow]]
+    #             ax=axs[irow,ind]
+    #             for itf,tf in enumerate(tfs_rainbow):
+    #                 mean,err=jackme(tf2ratio[tf])
+    #                 tcs=np.arange(tcmin_rainbow,tf-tcmin_rainbow+1)
+    #                 plt_x=(tcs-tf/2+0.05*(itf-len(tfs_rainbow)/2))*xunit; plt_y=mean[tcs]*yunit; plt_yerr=err[tcs]*yunit
+    #                 ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[itf],fmt=fmts16[itf])
+                    
+    #             key2='wing fit'
+    #             if key2 in keys:
+    #                 ind2=keys.index(key2)
+    #                 ax=axs[irow,ind2]
+                    
+                    
+    #     quotes=[]
+    #     return fig,axs,quotes
+            
+    def makePlot_3pt_ChristosStyle(list_tf2ratio_fits,xunit=1,yunit=1,tcmin_rainbow=1,selection=None):
         fig, axs = getFigAxs(len(list_tf2ratio_fits),4,Lrow=4,Lcol=6,sharex='col',sharey='row', gridspec_kw={'width_ratios': [3, 2, 2, 2]})
         irow=-1
         axs[irow,0].set_xlabel(r'$t_{\rm ins}-t_{s}/2$ [fm]')        
@@ -825,24 +1078,30 @@ if True:
         axs[irow,3].set_xlabel(r'Fit Prob.')
         
         ax=axs[irow,3]
-        xticks=[1,3,10,30]
-        ax.set_xlim([xticks[0]/2,xticks[-1]*3])
+        xticks=[1,3,10,30,90]
+        ax.set_xlim([xticks[0]/2,150])
         ax.set_xscale('log')
         ax.set_xticks(xticks)
         ax.set_xticklabels([f'{x}%' for x in xticks])
+        
+        def get_fittype(tf2ratio_fits):
+            tf2ratio,fits=tf2ratio_fits[:2]
+            fitlabel,pars_jk,chi2_jk,Ndof=fits[0]
+            if pars_jk.shape[1]==1:
+                fittype='1st'
+            elif len(list_tf2ratio_fits[irow])==3:
+                fittype='2st2step'
+            elif pars_jk.shape[1]==2:
+                fittype='sum'
+            else:
+                fittype='2st'
+            return fittype
         
         tfmin_ratio=1e10; tfmax_ratio=0
         tfmin_fit=1e10; tfmax_fit=0
         for irow in range(len(list_tf2ratio_fits)):
             tf2ratio,fits=list_tf2ratio_fits[irow][:2]
-            fitlabel,pars_jk,chi2_jk,Ndof=fits[0]
-            if pars_jk.shape[1]==1:
-                fittype='1st'
-            elif len(list_tf2ratio_fits[irow])==3:
-                pars_jk_meff2st=list_tf2ratio_fits[irow][2]
-                fittype='2st2step'
-            else:
-                fittype='2st'
+            fittype=get_fittype(list_tf2ratio_fits[irow])
                 
             pars_jk,props_jk=jackMA(fits)
             mean,err=jackme(pars_jk)
@@ -867,25 +1126,14 @@ if True:
         axs[0,1].set_xlim(np.array([tfmin_ratio-1,tfmax_ratio+3])*xunit)
         axs[0,2].set_xlim(np.array([tfmin_fit-1,tfmax_fit+1])*xunit)
                 
-        pars_jk_quotes=[]
+        result=[]
         for irow in range(len(list_tf2ratio_fits)):
             tf2ratio,fits=list_tf2ratio_fits[irow][:2]
-            fitlabel,pars_jk,chi2_jk,Ndof=fits[0]
-            if pars_jk.shape[1]==1:
-                fittype='1st'
-            elif len(list_tf2ratio_fits[irow])==3:
-                pars_jk_meff2st=list_tf2ratio_fits[irow][2]
-                fittype='2st2step'
-            else:
-                fittype='2st'
+            fittype=get_fittype(list_tf2ratio_fits[irow])
             
-            if ylabels is not None:
-                ax=axs[irow,0]
-                ax.set_ylabel(ylabels[irow])
-            
-            pars_jk_quote,props_jk=jackMA(fits)
-            pars_jk_quotes.append(pars_jk_quote)
-            mean,err=jackme(pars_jk_quote)
+            pars_jk,props_jk=jackMA(fits)
+            result.append(pars_jk)
+            mean,err=jackme(pars_jk)
             plt_y_quote,plt_yerr_quote=mean[0]*yunit,err[0]*yunit
             for icol in [0,1,2,3]:
                 ax=axs[irow,icol]
@@ -906,7 +1154,7 @@ if True:
                 
             ax=axs[irow,1]
             for itf,tf in enumerate(tfs_rainbow):
-                if fittype in ['1st']:
+                if fittype in ['1st','sum']:
                     y_jk=tf2ratio[tf][:,tcmin_rainbow:tf-tcmin_rainbow+1]
                     if np.all(y_jk[:,0]==y_jk[:,-1]): # check if symmetrized
                         y_jk=y_jk[:,:((y_jk.shape[1]+1)//2)]
@@ -917,7 +1165,7 @@ if True:
                 plt_x=(tf)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
                 ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[itf],fmt=fmts16[itf])
                 
-                if fittype in ['1st'] and tf+1 in tf2ratio.keys():
+                if fittype in ['1st','sum'] and tf+1 in tf2ratio.keys():
                     y_jk=tf2ratio[tf+1][:,tcmin_rainbow:tf-tcmin_rainbow+2]
                     if np.all(y_jk[:,0]==y_jk[:,-1]): # check if symmetrized
                         y_jk=y_jk[:,:((y_jk.shape[1]+1)//2)]
@@ -931,9 +1179,8 @@ if True:
             tcmins=list(set([fit[0][1] for fit in fits])); tcmins.sort()
             tfmins=list(set([fit[0][0] for fit in fits])); tfmins.sort()
             props=np.mean(props_jk,axis=0); inds=np.argsort(props)
-            ind_mpf_global=inds[-1]; ind_mpf2_global=inds[-2]
-            fitlabel_mpf=fits[ind_mpf_global][0]
-            fitlabel_mpf2=fits[ind_mpf2_global][0]
+            ind_mpf_global=inds[-1]; fitlabel_mpf=fits[ind_mpf_global][0]
+            # ind_mpf2_global=inds[-2]; fitlabel_mpf2=fits[ind_mpf2_global][0]
             for i_tfmin,tfmin in enumerate(tfmins):
                 tfits=[fit for fit in fits if fit[0][0]==tfmin]
                 pars_jk,props_jk=jackMA(tfits)
@@ -945,7 +1192,7 @@ if True:
                 plt_x=(tfmin)*xunit; plt_y=mean[0]*yunit; plt_yerr=err[0]*yunit
                 ax.errorbar(plt_x,plt_y,plt_yerr,color='r',mfc='white' if (tfmin,tcmin)==fitlabel_mpf else None) 
             
-            if fittype in ['2st','2st2steps']:
+            if fittype in ['2st','2st2step']:
                 pars_jk,props_jk=jackMA(fits)
                 ind_mpf=np.argmax(np.mean(props_jk,axis=0))
                 (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fits[ind_mpf]
@@ -955,16 +1202,18 @@ if True:
                     if tf<tfmin:
                         continue
                     tcs=np.arange(t_cut,tf-t_cut,0.1)
-                    if fittype in ['2st2steps']:
+                    if fittype in ['2st2step']:
+                        pars_jk_meff2st=list_tf2ratio_fits[irow][2]
                         t=np.array([func_ratio_2st(tf,tcs,pars[0],pars_2pt[1],pars_2pt[2],pars[1],pars[2]) for pars, pars_2pt in zip(pars_jk,pars_jk_meff2st)])
                     else:
                         t=np.array([func_ratio_2st(tf,tcs,*pars) for pars in pars_jk])
                     mean,err=jackme(t)
                     plt_x=(tcs-tf//2)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=colors16[itf],fmt=fmts16[itf],alpha=0.2)   
+                    ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=colors16[itf],alpha=0.2)   
                 ax=axs[irow,1]
                 tfs=np.arange(ax.get_xlim()[0]/xunit,ax.get_xlim()[1]/xunit,0.1)
-                if fittype in ['2st2steps']:
+                if fittype in ['2st2step']:
+                    pars_jk_meff2st=list_tf2ratio_fits[irow][2]
                     t=np.array([func_ratio_2st(tfs,tfs/2,pars[0],pars_2pt[1],pars_2pt[2],pars[1],pars[2]) for pars, pars_2pt in zip(pars_jk,pars_jk_meff2st)])
                 else:
                     t=np.array([func_ratio_2st(tfs,tfs/2,*pars) for pars in pars_jk])
@@ -985,8 +1234,8 @@ if True:
                             label=f'{int(props[ind_mpf_global]*100)}%; {(tfmin,tcmin)}' if (tfmin,tcmin)==fitlabel_mpf else None)
             ax.legend(fontsize=16)
             
-        return fig,axs,pars_jk_quotes
-
+        return fig,axs,result
+    
 #!============== GEVP ==============#
 if True:
     def GEVP(Ct,t0List,tList=None,tvList=None):
@@ -1056,7 +1305,6 @@ if True:
     ens2NL={'a24':24,'a':48,'b':64,'c':80,'d':96,'e':112}
     ens2NT={'a24':24*2,'a':48*2,'b':64*2,'c':80*2,'d':96*2,'e':112*2}
 
-    hbarc = 1/197.3
     ens2aInv={ens:1/(ens2a[ens]*hbarc) for ens in ens2a.keys()} # MeV
 
 #!============== obsolete  ==============#
