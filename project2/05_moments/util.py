@@ -21,7 +21,7 @@ mpl.rcParams['axes.labelsize'] = 24
 mpl.rcParams['axes.titlesize'] = 24
 mpl.rcParams['lines.marker'] = 's'
 mpl.rcParams['lines.linestyle'] = ''
-mpl.rcParams['lines.markersize'] = 6
+mpl.rcParams['lines.markersize'] = 7
 mpl.rcParams['errorbar.capsize'] = 6
 mpl.rcParams['xtick.labelsize'] = mpl.rcParams['ytick.labelsize'] = 22
 mpl.rcParams['xtick.major.size'] = mpl.rcParams['ytick.major.size'] = 10
@@ -123,10 +123,6 @@ if True:
         if os.path.isfile(f'{path_pkl_internal}{any2filename(file)}.pkl'):
             os.remove(f'{path_pkl_internal}{any2filename(file)}.pkl')
     
-    def find_t_cloest(t,ens):
-        return round(t/ens2a[ens])
-    def get_tfs(tmin,tmax,ens,dt=1):
-        return range(find_t_cloest(tmin,ens),find_t_cloest(tmax,ens),dt)
     def cut_tf2ratio(tf2ratio,tfmax,tfmin=0):
         return {tf:tf2ratio[tf] for tf in tf2ratio.keys() if tfmin<=tf<=tfmax}
     
@@ -395,7 +391,7 @@ if True:
 if True:
     def jackfit(fitfunc,y_jk,pars0,mask=None,parsExtra_jk=None,priors=[],**kargs):
         '''
-        return=pars_jk,chi2_jk,Ndof,Nwarning
+        return pars_jk,chi2_jk,Ndof,Nwarning \\
         priors=[(ind of par, mean, width)]
         '''
         with warnings.catch_warnings(record=True) as list_warnings:
@@ -459,6 +455,9 @@ if True:
         return fitmax
     
     def doFit_const(y_jk,corrQ=True):
+        '''
+        return pars_jk,chi2_jk,Ndof
+        '''
         Ndata=y_jk.shape[1]
         if Ndata==1:
             return y_jk,np.zeros((len(y_jk),1)),0
@@ -623,9 +622,9 @@ if True:
         pars_jk,chi2_jk,Ndof=doFit_const(y_jk)
         return pars_jk,chi2_jk,Ndof,tf_min,tf_max,tcmin
     
-    def doMA_3pt(fits,tfmin_min=None,tfmin_max=None,tcmin_min=None,tcmin_max=None,threshold=0):
+    def doMA_3pt(fits,tfmin_min=None,tfmin_max=None,tcmin_min=None,tcmin_max=None,probThreshold=None,chi2RThreshold=None):
         '''
-        return: pars_jk,chi2_jk,Ndof,tf_min,tf_max,tcmin
+        return: pars_jk,probs_jk,fitlabels
         '''
         tfmins=[fit[0][0] for fit in fits]
         tcmins=[fit[0][1] for fit in fits]
@@ -640,13 +639,14 @@ if True:
             
         fits=[fit for fit in fits if tfmin_min<=fit[0][0]<=tfmin_max and tcmin_min<=fit[0][1]<=tcmin_max]
         pars_jk,probs_jk=jackMA(fits)
-        if threshold!=0:
-            probs=np.mean(probs_jk,axis=0)
-            inds=[i for i in range(len(probs)) if probs[i]>=threshold]
-            fits=fits[inds]
+        if chi2RThreshold is not None:
+            fits=[fit for fit in fits if np.mean(fit[1]/fit[2])<=chi2RThreshold]
             pars_jk,probs_jk=jackMA(fits)
-        fitlabels=[fit[0] for fit in fits]
-        return pars_jk,probs_jk,fitlabels
+        if probThreshold is not None:
+            probs=np.mean(probs_jk,axis=0)
+            fits=[fits[i] for i in range(len(probs)) if probs[i]>=probThreshold]
+            pars_jk,probs_jk=jackMA(fits)
+        return pars_jk,probs_jk,fits
     
     @decorator_fits
     def doFit_3pt_1st(tf2ratio_para,tfmins,tcmins,pars0=None,downSampling=[1,1],symmetrizeQ=False,corrQ=True):
@@ -818,59 +818,13 @@ if True:
             ax.set_xticklabels(xticklabels)
         return fig,axs
     
-    # def addPlot_continuumExtrapolation(ax,ens2dat,lat_a2s_plt=None,color='g',shows=['MA'],colors=None,prelabels=None):
-    #     enss=list(ens2dat.keys()); enss.sort()
-    #     lat_a2s=[ens2a[ens]**2 for ens in enss]
-    #     lat_a2s_plt=np.arange(0,np.max(lat_a2s)*1.2,np.max(lat_a2s)/0.1) if lat_a2s_plt is None else lat_a2s_plt
+    def makePlot_continuumExtrapolation(matrix_dic,shows=['MA']):
+        if type(matrix_dic)==dict:
+            matrix_dic=[[matrix_dic]]
+        elif type(matrix_dic[0])==dict:
+            matrix_dic=[matrix_dic]
         
-    #     dat=[ens2dat[ens] for ens in enss]
-    #     fits=doFit_continuumExtrapolation(dat,lat_a2s_plt=lat_a2s_plt)
-        
-    #     if colors is None and len(shows)==1:
-    #         colors=[color]
-    #     if colors is None and len(shows)>1:
-    #         dic={'const':'r','linear':'b','MA':'orange'}
-    #         colors=[dic[show] for show in shows]
-    #     fitlabel2color={fitlabel:colors[i] for i,fitlabel in enumerate(shows)}
-        
-    #     if prelabels is None:
-    #         prelabels=[None]*len(shows)
-    #     fitlabel2prelabel={fitlabel:prelabels[i] for i,fitlabel in enumerate(shows)} 
-        
-    #     mes=[jackme(ele) for ele in dat]
-    #     plt_x=np.array(lat_a2s); plt_y=[me[0][0] for me in mes]; plt_yerr=[me[1][0] for me in mes]
-    #     ax.errorbar(plt_x,plt_y,plt_yerr,color=color)
-        
-    #     for fit in fits:
-    #         fitlabel,pars_jk,chi2_jk,Ndof=fit
-    #         if fitlabel not in shows:
-    #             continue
-    #         mean,err=jackme(pars_jk)
-    #         x=np.array(lat_a2s_plt); ymin=mean-err; ymax=mean+err
-    #         ax.plot(x,mean,color=fitlabel2color[fitlabel],linestyle='--',marker='')
-    #         prelabel=fitlabel2prelabel[fitlabel]
-    #         label=None if prelabel is None else f'{prelabel}{un2str(mean[0],err[0])}' if prelabel.endswith('=') else prelabel
-    #         ax.fill_between(x, ymin, ymax, color=fitlabel2color[fitlabel], alpha=0.1,label=label)
-    #     for fitlabel in ['MA']:
-    #         if fitlabel not in shows:
-    #             continue
-    #         pars_jk,probs_jk=jackMA(fits)
-    #         mean,err=jackme(pars_jk)
-    #         x=np.array(lat_a2s_plt); ymin=mean-err; ymax=mean+err
-    #         ax.plot(x,mean,color=fitlabel2color[fitlabel],linestyle='--',marker='')
-    #         prelabel=fitlabel2prelabel[fitlabel]
-    #         label=None if prelabel is None else f'{prelabel}{un2str(mean[0],err[0])}' if prelabel.endswith('=') else prelabel
-    #         ax.fill_between(x, ymin, ymax, color=fitlabel2color[fitlabel], alpha=0.1,label=label)
-    
-    def makePlot_continuumExtrapolation(matrix_dat,lat_a2s,lat_a2s_plt,matrix_fits,shows=['MA'],multiRowColQ=(False,False)):
-        matrix_dat,matrix_fits={
-            (False,False):([[matrix_dat]],[[matrix_fits]]),
-            (False,True):([matrix_dat],[matrix_fits]),
-            (True,False):([[dat] for dat in matrix_dat],[[fits] for fits in matrix_fits]),
-            (True,True):(matrix_dat,matrix_fits),
-        }[multiRowColQ]
-        
-        Nrow,Ncol=len(matrix_dat),len(matrix_dat[0])
+        Nrow,Ncol=len(matrix_dic),len(matrix_dic[0])
         fig,axs=getFigAxs(Nrow,Ncol,sharex='col',sharey='row')
         for icol in range(Ncol):
             ax=axs[-1,icol]
@@ -879,10 +833,16 @@ if True:
         for irow in range(Nrow):
             for icol in range(Ncol):
                 ax=axs[irow,icol]
-                dat=matrix_dat[irow][icol]; fits=matrix_fits[irow][icol]
+                dic=matrix_dic[irow][icol]
+                ens2dat=dic['ens2dat']
+                fits,lat_a2s_plt=dic['fit:[fits,lat_a2s_plt]']
+                lat_a2s_plt=np.array(lat_a2s_plt)
+                enss=list(ens2dat.keys())
+                
+                lat_a2s=np.array([ens2a[ens]**2 for ens in enss])
 
-                mes=[jackme(ele) for ele in dat]
-                plt_x=np.array(lat_a2s); plt_y=[me[0][0] for me in mes]; plt_yerr=[me[1][0] for me in mes]
+                mes=[jackme(ens2dat[ens]) for ens in enss]
+                plt_x=lat_a2s; plt_y=[me[0] for me in mes]; plt_yerr=[me[1] for me in mes]
                 ax.errorbar(plt_x,plt_y,plt_yerr,color='g')
                 
                 colors={'const':'r','linear':'b','MA':'orange'}
@@ -892,7 +852,7 @@ if True:
                     if fitlabel not in shows:
                         continue
                     mean,err=jackme(pars_jk)
-                    x=np.array(lat_a2s_plt); ymin=mean-err; ymax=mean+err
+                    x=lat_a2s_plt; ymin=mean-err; ymax=mean+err
                     ax.plot(x,mean,color=colors[fitlabel],linestyle='--',marker='')
                     ax.fill_between(x, ymin, ymax, color=colors[fitlabel], alpha=0.1,label=f'{fitlabel}={un2str(mean[0],err[0])}')
                 for fitlabel in ['MA']:
@@ -900,7 +860,7 @@ if True:
                         continue
                     pars_jk,probs_jk=jackMA(fits)
                     mean,err=jackme(pars_jk)
-                    x=np.array(lat_a2s_plt); ymin=mean-err; ymax=mean+err
+                    x=lat_a2s_plt; ymin=mean-err; ymax=mean+err
                     ax.plot(x,mean,color=colors[fitlabel],linestyle='--',marker='')
                     ax.fill_between(x, ymin, ymax, color=colors[fitlabel], alpha=0.1,label=f'{fitlabel}={un2str(mean[0],err[0])}')
                 
@@ -1075,13 +1035,24 @@ if True:
 #!============== plot (3pt) ==============#
 if True:
     def makePlot_3pt(list_dic,shows=['rainbow','fit_band','fit_const','fit_sum','fit_2st'],colHeaders='auto',colors_rainbow=colors16,colors_fit=colors8):
+        '''
+        base:[tf2ratio,fits_band,fits_const,fits_sum,fits_2st] \\
+        rainbow:[tfmin,tfmax,tcmin,dt] \\
+        fit_band:[tfmin,tfmax,tcmin_min,tcmin_max] \\
+        fit_band_WA \\
+        fit_#:[tfmin_min,tfmin_max,tcmin_min,tcmin_max] \\
+        fit_#_MA \\
+        fit_2st_rainbow_midpoint:[pars_jk_meff2st]
+        '''
+        if type(list_dic)==dict:
+            list_dic=[list_dic]
         width_ratios=[3 if show in ['rainbow'] else 2 for show in shows]
         Nrow=len(list_dic); Ncol=len(shows)
         fig, axs = getFigAxs(Nrow,Ncol,Lrow=4,Lcol=6,sharex='col',sharey='row', gridspec_kw={'width_ratios': width_ratios})
         if colHeaders is not None:
             show2Header={'rainbow':r'ratio','midpoint':r'mid point','fit_band':r'const fit to each $t_s$',
                     'fit_const':r'const fit', 'fit_2st':r'2st fit', 'fit_sum':r'summation method',
-                    'fit_const_prob':r'Fit Prob.','fit_sum_prob':r'Fit Prob.','fit_2st_prob':r'Fit Prob.'}
+                    'fit_const_prob':r'Fit Prob. (const)','fit_sum_prob':r'Fit Prob. (sum)','fit_2st_prob':r'Fit Prob. (2st)'}
             addColHeader(axs,[show2Header[show] for show in shows] if colHeaders=='auto' else colHeaders)
             
         show2xlabel={'rainbow':r'$t_{\rm ins}-t_{s}/2$ [fm]','midpoint':r'$t_{s}^{\rm}$ [fm]','fit_band':r'$t_{s}^{\rm}$ [fm]',
@@ -1090,6 +1061,17 @@ if True:
         for i in range(Ncol):
             axs[-1,i].set_xlabel(show2xlabel[shows[i]])
         
+        for show in shows:
+            if show.endswith('_prob'):
+                ax=axs[-1,shows.index(show)]  
+                xticks=[1,3,10,30,90]
+                ax.set_xlim([xticks[0]/2,150])
+                ax.set_xscale('log')
+                ax.set_xticks(xticks)
+                ax.set_xticklabels([f'{x}%' for x in xticks])
+                
+        # determine fit ranges
+        tfs_mids_phy=[]
         for irow in range(Nrow):
             dic=list_dic[irow]
             def setParameter(default,key):
@@ -1102,8 +1084,34 @@ if True:
                             res[i]=default[i]
                     return res
                 return default
-            def setParameter2(default,now):
-                return default if now is None else now
+            
+            # general
+            xunit=setParameter(1,'xunit')
+            yunit=setParameter(1,'yunit')
+            (tf2ratio,fits_band,fits_const,fits_sum,fits_2st)=setParameter([None,None,None,None,None],'base:[tf2ratio,fits_band,fits_const,fits_sum,fits_2st]')
+            tfs_all=list(tf2ratio.keys()); tfs_all.sort()
+            # rainbow
+            (tfmin,tfmax,tcmin,dt)=setParameter([0,np.inf,1,1],'rainbow:[tfmin,tfmax,tcmin,dt]')
+            tfs_rainbow=[tf for tf in tfs_all if tfmin<=tf<=tfmax and tf%dt==0 and tf>=tcmin*2]
+            tcmin_rainbow=tcmin
+            tfs_mid=setParameter(tfs_rainbow,'tfs_mid')
+            tfs_mids_phy+=[(min(tfs_mid)-1)*xunit,(max(tfs_mid)+1)*xunit]
+        if 'midpoint' in shows:
+            ax=axs[-1,shows.index('midpoint')]
+            ax.set_xlim([min(tfs_mids_phy),max(tfs_mids_phy)])
+                
+        for irow in range(Nrow):
+            dic=list_dic[irow]
+            def setParameter(default,key):
+                if type(default) is not list:
+                    return dic[key] if key in dic else default                
+                if key in dic:
+                    res=dic[key]
+                    for i in range(len(res)):
+                        if res[i] is None:
+                            res[i]=default[i]
+                    return res
+                return default
             
             # general
             xunit=setParameter(1,'xunit')
@@ -1126,35 +1134,21 @@ if True:
                 fit_band_WA=setParameter(None,'fit_band_WA')
             else:
                 tfs_band=[]
-            # fit_const
-            if fits_const is not None:
-                fits=fits_const
-                tfmins=removeDuplicates([fit[0][0] for fit in fits])
-                tcmins=removeDuplicates([fit[0][1] for fit in fits])
-                (tfmin_min,tfmin_max,tcmin_min,tcmin_max)=setParameter([min(tfmins),max(tfmins),min(tcmins),max(tcmins)],'fit_const:[tfmin_min,tfmin_max,tcmin_min,tcmin_max]')
-                tfmins_const=[tfmin for tfmin in tfmins if tfmin_min<=tfmin<=tfmin_max]
-                tcmins_const=[tcmin for tcmin in tcmins if tcmin_min<=tcmin<=tcmin_max]
-                fit_const_MA=setParameter(None,'fit_const_MA')
-            # fit_sum
-            if fits_sum is not None:
-                fits=fits_sum
-                tfmins=removeDuplicates([fit[0][0] for fit in fits])
-                tcmins=removeDuplicates([fit[0][1] for fit in fits])
-                (tfmin_min,tfmin_max,tcmin_min,tcmin_max)=setParameter([min(tfmins),max(tfmins),min(tcmins),max(tcmins)],'fit_sum:[tfmin_min,tfmin_max,tcmin_min,tcmin_max]')
-                tfmins_sum=[tfmin for tfmin in tfmins if tfmin_min<=tfmin<=tfmin_max]
-                tcmins_sum=[tcmin for tcmin in tcmins if tcmin_min<=tcmin<=tcmin_max]
-                fit_sum_MA=setParameter(None,'fit_sum_MA')
-            # fit_2st
-            if fits_2st is not None:
-                fits=fits_2st
-                tfmins=removeDuplicates([fit[0][0] for fit in fits])
-                tcmins=removeDuplicates([fit[0][1] for fit in fits])
-                (tfmin_min,tfmin_max,tcmin_min,tcmin_max)=setParameter([min(tfmins),max(tfmins),min(tcmins),max(tcmins)],'fit_2st:[tfmin_min,tfmin_max,tcmin_min,tcmin_max]')
-                tfmins_2st=[tfmin for tfmin in tfmins if tfmin_min<=tfmin<=tfmin_max]
-                tcmins_2st=[tcmin for tcmin in tcmins if tcmin_min<=tcmin<=tcmin_max]
-                fit_2st_MA=setParameter(None,'fit_2st_MA')
-            
-            
+                
+            def process_fits(fits,name):
+                if fits is not None:
+                    tfmins=removeDuplicates([fit[0][0] for fit in fits])
+                    tcmins=removeDuplicates([fit[0][1] for fit in fits])
+                    (tfmin_min,tfmin_max,tcmin_min,tcmin_max)=setParameter([min(tfmins),max(tfmins),min(tcmins),max(tcmins)],f'{name}:[tfmin_min,tfmin_max,tcmin_min,tcmin_max]')
+                    tfmins=[tfmin for tfmin in tfmins if tfmin_min<=tfmin<=tfmin_max]
+                    tcmins=[tcmin for tcmin in tcmins if tcmin_min<=tcmin<=tcmin_max]
+                    fit_MA=setParameter(None,f'{name}_MA')
+                    return tfmins,tcmins,fit_MA
+                return None,None,None
+            tfmins_const,tcmins_const,fit_const_MA=process_fits(fits_const,'fit_const')
+            tfmins_sum,tcmins_sum,fit_sum_MA=process_fits(fits_sum,'fit_sum')
+            tfmins_2st,tcmins_2st,fit_2st_MA=process_fits(fits_2st,'fit_2st')
+
             tfs_color=removeDuplicates(tfs_rainbow+tfs_band+tfs_mid)
             
             show='rainbow'
@@ -1164,6 +1158,17 @@ if True:
                     mean,err=jackme(tf2ratio[tf])
                     tcs=np.arange(tcmin_rainbow,tf-tcmin_rainbow+1)
                     plt_x=(tcs-tf/2+0.05*(itf-len(tfs_rainbow)/2))*xunit; plt_y=mean[tcs]*yunit; plt_yerr=err[tcs]*yunit
+                    itf_color=tfs_color.index(tf)
+                    ax.errorbar(plt_x,plt_y,plt_yerr,color=colors_rainbow[itf_color%16],fmt=fmts16[itf_color%16])
+                    
+            show='midpoint'
+            if show in shows:
+                ax=axs[irow,shows.index(show)]                
+                for itf,tf in enumerate(tfs_mid):
+                    if tf%2!=0:
+                        continue
+                    mean,err=jackme(tf2ratio[tf][:,tf//2])
+                    plt_x=tf*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
                     itf_color=tfs_color.index(tf)
                     ax.errorbar(plt_x,plt_y,plt_yerr,color=colors_rainbow[itf_color%16],fmt=fmts16[itf_color%16])
                     
@@ -1191,441 +1196,81 @@ if True:
                     mean,err=jackme(pars_jk[:,0])
                     plt_x=(tf+itcmin*0.1)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
                     ax.errorbar(plt_x,plt_y,plt_yerr,color=colors_rainbow[itf%16],fmt=fmts16[itf%16],mfc=mfc)
-            
-            show='fit_const'
-            fits=fits_const
-            if show in shows and fits is not None:
-                ax=axs[irow,shows.index(show)]
-                fit_MA=fit_const_MA; tfmins,tcmins=tfmins_const,tcmins_const
-                if fit_MA is not None:
-                    pars_jk,probs_jk,fitlabels=fit_MA
-                    tfs=removeDuplicates([fitlabel[0] for fitlabel in fitlabels])
-                    mean,err=jackme(pars_jk[:,0])
-                    plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.axhspan(plt_y-plt_yerr,plt_y+plt_yerr,color='r',alpha=0.2,label=un2str(plt_y,plt_yerr))
-                    ax.legend()
-                
-                for fit in fits:
-                    (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fit
-                    if tfmin not in tfmins or tcmin not in tcmins:
-                        continue
-                    itcmin=tcmins.index(tcmin)
-                    mfc=None
-                    if fit_MA is not None and (tfmin,tcmin) in fitlabels:
-                        mfc='white'
-                    mean,err=jackme(pars_jk[:,0])
-                    plt_x=(tfmin+itcmin*0.1)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=colors_fit[itcmin],mfc=mfc)
-
-            show='fit_sum'
-            fits=fits_sum
-            if show in shows and fits is not None:
-                ax=axs[irow,shows.index(show)]
-                fit_MA=fit_sum_MA; tfmins,tcmins=tfmins_sum,tcmins_sum
-                if fit_MA is not None:
-                    pars_jk,probs_jk,fitlabels=fit_MA
-                    tfs=removeDuplicates([fitlabel[0] for fitlabel in fitlabels])
-                    mean,err=jackme(pars_jk[:,0])
-                    plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.axhspan(plt_y-plt_yerr,plt_y+plt_yerr,color='r',alpha=0.2,label=un2str(plt_y,plt_yerr))
-                    ax.legend()
-                
-                for fit in fits:
-                    (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fit
-                    if tfmin not in tfmins or tcmin not in tcmins:
-                        continue
-                    itcmin=tcmins.index(tcmin)
-                    mfc=None
-                    if fit_MA is not None and (tfmin,tcmin) in fitlabels:
-                        mfc='white'
-                    mean,err=jackme(pars_jk[:,0])
-                    plt_x=(tfmin+itcmin*0.1)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=colors_fit[itcmin],mfc=mfc)
-                
-            show='fit_2st'
-            fits=fits_2st
-            if show in shows and fits is not None:
-                ax=axs[irow,shows.index(show)]
-                fit_MA=fit_2st_MA; tfmins,tcmins=tfmins_2st,tcmins_2st
-                if fit_MA is not None:
-                    pars_jk,probs_jk,fitlabels=fit_MA
-                    tfs=removeDuplicates([fitlabel[0] for fitlabel in fitlabels])
-                    mean,err=jackme(pars_jk[:,0])
-                    plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.axhspan(plt_y-plt_yerr,plt_y+plt_yerr,color='r',alpha=0.2,label=un2str(plt_y,plt_yerr))
-                    ax.legend()
-                
-                for fit in fits:
-                    (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fit
-                    if tfmin not in tfmins or tcmin not in tcmins:
-                        continue
-                    itcmin=tcmins.index(tcmin)
-                    mfc=None
-                    if fit_MA is not None and (tfmin,tcmin) in fitlabels:
-                        mfc='white'
-                    mean,err=jackme(pars_jk[:,0])
-                    plt_x=(tfmin+itcmin*0.1)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=colors_fit[itcmin],mfc=mfc)
-            
-    def makePlot_3pt_ChristosStyle(list_tf2ratio_fits,xunits=1,yunits=1,tcmin_rainbow=1,selection=None):
-        if type(xunits)!=list:
-            xunits=[xunits]*len(list_tf2ratio_fits)
-        if type(yunits)!=list:
-            yunits=[yunits]*len(list_tf2ratio_fits)
-        
-        fig, axs = getFigAxs(len(list_tf2ratio_fits),4,Lrow=4,Lcol=6,sharex='col',sharey='row', gridspec_kw={'width_ratios': [3, 2, 2, 2]})
-        irow=-1
-        axs[irow,0].set_xlabel(r'$t_{\rm ins}-t_{s}/2$ [fm]')        
-        axs[irow,1].set_xlabel(r'$t_{s}$ [fm]')
-        axs[irow,2].set_xlabel(r'$t_{s}^{\rm low}$ [fm]')
-        axs[irow,3].set_xlabel(r'Fit Prob.')
-        
-        ax=axs[irow,3]
-        xticks=[1,3,10,30,90]
-        ax.set_xlim([xticks[0]/2,150])
-        ax.set_xscale('log')
-        ax.set_xticks(xticks)
-        ax.set_xticklabels([f'{x}%' for x in xticks])
-        
-        def get_fittype(tf2ratio_fits):
-            tf2ratio,fits=tf2ratio_fits[:2]
-            fitlabel,pars_jk,chi2_jk,Ndof=fits[0]
-            if pars_jk.shape[1]==1:
-                fittype='1st'
-            elif len(list_tf2ratio_fits[irow])==3:
-                fittype='2st2step'
-            elif pars_jk.shape[1]==2:
-                fittype='sum'
-            else:
-                fittype='2st'
-            return fittype
-        
-        tfmin_ratio=1e10; tfmax_ratio=0
-        tfmin_fit=1e10; tfmax_fit=0
-        for irow in range(len(list_tf2ratio_fits)):
-            xunit=xunits[irow]; yunit=yunits[irow]
-            tf2ratio,fits=list_tf2ratio_fits[irow][:2]
-            fittype=get_fittype(list_tf2ratio_fits[irow])
-                
-            pars_jk,probs_jk=jackMA(fits)
-            mean,err=jackme(pars_jk)
-            plt_y_quote,plt_yerr_quote=mean[0]*yunit,err[0]*yunit
-
-            tfs=list(tf2ratio.keys()); tfs.sort()
-            tfs_rainbow=[tf for tf in tfs if tf%2==0 and tf>=2*tcmin_rainbow and jackme(tf2ratio[tf][:,tf//2])[1]*yunit<plt_yerr_quote*5]
-            if len(tfs_rainbow)==0:
-                tfs_rainbow=[tf for tf in tfs if tf%2==0 and tf>=2*tcmin_rainbow and jackme(tf2ratio[tf][:,tf//2])[1]*yunit<plt_yerr_quote*20]
-            # print(irow,tfs_rainbow)
-            
-            tcmins=list(set([fit[0][1] for fit in fits])); tcmins.sort()
-            tfmins=list(set([fit[0][0] for fit in fits])); tfmins.sort()
-            
-            tfmin_ratio=min(tfmin_ratio,np.min(tfs_rainbow))
-            tfmax_ratio=max(tfmax_ratio,np.max(tfs_rainbow))
-            
-            tfmin_fit=min(tfmin_fit,np.min(tfmins))
-            tfmax_fit=max(tfmax_fit,np.max(tfmins))
-            
-        axs[0,0].set_xlim(np.array([-tfmax_ratio/2+(tcmin_rainbow-1),tfmax_ratio/2-(tcmin_rainbow-1)])*xunit)
-        axs[0,1].set_xlim(np.array([tfmin_ratio-1,tfmax_ratio+3])*xunit)
-        axs[0,2].set_xlim(np.array([tfmin_fit-1,tfmax_fit+1])*xunit)
-                
-        result=[]
-        for irow in range(len(list_tf2ratio_fits)):
-            xunit=xunits[irow]; yunit=yunits[irow]
-            tf2ratio,fits=list_tf2ratio_fits[irow][:2]
-            fittype=get_fittype(list_tf2ratio_fits[irow])
-            
-            pars_jk,probs_jk=jackMA(fits)
-            result.append(pars_jk)
-            mean,err=jackme(pars_jk)
-            plt_y_quote,plt_yerr_quote=mean[0]*yunit,err[0]*yunit
-            for icol in [0,1,2,3]:
-                ax=axs[irow,icol]
-                plt_x=ax.get_xlim(); plt_y=plt_y_quote; plt_yerr=plt_yerr_quote
-                ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color='red',alpha=0.2,label=un2str(plt_y,plt_yerr))  
-            if fittype in ['1st']:
-                axs[irow,0].set_ylim([plt_y_quote-plt_yerr_quote*16,plt_y_quote+plt_yerr_quote*16])
-                
-            tfs=list(tf2ratio.keys()); tfs.sort()
-            tfs_rainbow=[tf for tf in tfs if tf%2==0 and tf>=2*tcmin_rainbow and jackme(tf2ratio[tf][:,tf//2])[1]*yunit<plt_yerr_quote*5]
-                
-            ax=axs[irow,0]
-            for itf,tf in enumerate(tfs_rainbow):
-                mean,err=jackme(tf2ratio[tf])
-                tcs=np.arange(tcmin_rainbow,tf-tcmin_rainbow+1)
-                plt_x=(tcs-tf/2+0.05*(itf-len(tfs_rainbow)/2))*xunit; plt_y=mean[tcs]*yunit; plt_yerr=err[tcs]*yunit
-                ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[itf],fmt=fmts16[itf])
-                
-            ax=axs[irow,1]
-            for itf,tf in enumerate(tfs_rainbow):
-                if fittype in ['1st','sum']:
-                    y_jk=tf2ratio[tf][:,tcmin_rainbow:tf-tcmin_rainbow+1]
-                    if np.all(y_jk[:,0]==y_jk[:,-1]): # check if symmetrized
-                        y_jk=y_jk[:,:((y_jk.shape[1]+1)//2)]
-                    pars_jk,_,_=doFit_const(y_jk)
-                    mean,err=jackme(pars_jk)
-                elif fittype in ['2st','2st2step']:
-                    mean,err=jackme(tf2ratio[tf][:,tf//2])
-                plt_x=(tf)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[itf],fmt=fmts16[itf])
-                
-                if fittype in ['1st','sum'] and tf+1 in tf2ratio.keys():
-                    y_jk=tf2ratio[tf+1][:,tcmin_rainbow:tf-tcmin_rainbow+2]
-                    if np.all(y_jk[:,0]==y_jk[:,-1]): # check if symmetrized
-                        y_jk=y_jk[:,:((y_jk.shape[1]+1)//2)]
-                    pars_jk,_,_=doFit_const(y_jk)
-                    mean,err=jackme(pars_jk)
-                    plt_x=(tf+1)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[itf+len(tfs_rainbow)],fmt=fmts16[itf+len(tfs_rainbow)])
                     
-                
-            ax=axs[irow,2]
-            tcmins=list(set([fit[0][1] for fit in fits])); tcmins.sort()
-            tfmins=list(set([fit[0][0] for fit in fits])); tfmins.sort()
-            probs=np.mean(probs_jk,axis=0); inds=np.argsort(probs)
-            ind_mpf_global=inds[-1]; fitlabel_mpf=fits[ind_mpf_global][0]
-            # ind_mpf2_global=inds[-2]; fitlabel_mpf2=fits[ind_mpf2_global][0]
-            for i_tfmin,tfmin in enumerate(tfmins):
-                tfits=[fit for fit in fits if fit[0][0]==tfmin]
-                pars_jk,probs_jk=jackMA(tfits)
-                ind_mpf=np.argmax(np.mean(probs_jk,axis=0))
-                
-                (tfmin,tcmin),pars_jk,chi2_jk,Ndof=tfits[ind_mpf]
-                mean,err=jackme(pars_jk)
-                
-                plt_x=(tfmin)*xunit; plt_y=mean[0]*yunit; plt_yerr=err[0]*yunit
-                ax.errorbar(plt_x,plt_y,plt_yerr,color='r',mfc='white' if (tfmin,tcmin)==fitlabel_mpf else None) 
-            
-            if fittype in ['2st','2st2step']:
-                pars_jk,probs_jk=jackMA(fits)
-                ind_mpf=np.argmax(np.mean(probs_jk,axis=0))
-                (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fits[ind_mpf]
-                ax=axs[irow,0]
-                t_cut=tcmin
-                for itf,tf in enumerate(tfs_rainbow):
-                    if tf<tfmin:
-                        continue
-                    tcs=np.arange(t_cut,tf-t_cut,0.1)
-                    if fittype in ['2st2step']:
-                        pars_jk_meff2st=list_tf2ratio_fits[irow][2]
-                        t=np.array([func_ratio_2st(tf,tcs,pars[0],pars_2pt[1],pars_2pt[2],pars[1],pars[2]) for pars, pars_2pt in zip(pars_jk,pars_jk_meff2st)])
-                    else:
-                        t=np.array([func_ratio_2st(tf,tcs,*pars) for pars in pars_jk])
-                    mean,err=jackme(t)
-                    plt_x=(tcs-tf//2)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                    ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=colors16[itf],alpha=0.2)   
-                ax=axs[irow,1]
-                tfs=np.arange(ax.get_xlim()[0]/xunit,ax.get_xlim()[1]/xunit,0.1)
-                if fittype in ['2st2step']:
-                    pars_jk_meff2st=list_tf2ratio_fits[irow][2]
-                    t=np.array([func_ratio_2st(tfs,tfs/2,pars[0],pars_2pt[1],pars_2pt[2],pars[1],pars[2]) for pars, pars_2pt in zip(pars_jk,pars_jk_meff2st)])
-                else:
-                    t=np.array([func_ratio_2st(tfs,tfs/2,*pars) for pars in pars_jk])
-                mean,err=jackme(t)
-                plt_x=tfs*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-                ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color='grey',alpha=0.2)   
-                
-            ax=axs[irow,3]
-            pars_jk,probs_jk=jackMA(fits)
-            for ifit, fit in enumerate(fits):
-                (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fit
-                prob=np.mean(probs_jk,axis=0)[ifit]
-                if prob<1/100:
-                    continue
-                mean,err=jackme(pars_jk)
-                plt_x=(prob)*100; plt_y=mean[0]*yunit; plt_yerr=err[0]*yunit
-                ax.errorbar(plt_x,plt_y,plt_yerr,color='r',mfc='white' if (tfmin,tcmin)==fitlabel_mpf else None,
-                            label=f'{int(probs[ind_mpf_global]*100)}%; {(tfmin,tcmin)}' if (tfmin,tcmin)==fitlabel_mpf else None)
-            ax.legend(fontsize=16)
-            
-        return fig,axs,result
-    
-    # def makePlot_3pt_KyliakosStyle_extend(list_dic):
-    #     result=[]
-    #     fig, axs = getFigAxs(len(list_dic),5,Lrow=4,Lcol=6,sharex='col',sharey='row', gridspec_kw={'width_ratios': [3, 2, 2, 2, 2]})
-    #     addColHeader(axs,['rainbow',r'fit to each $t_s$','sum','const','2st'])
-    #     irow=-1
-    #     axs[irow,0].set_xlabel(r'$t_{\rm ins}-t_{s}/2$ [fm]')        
-    #     axs[irow,1].set_xlabel(r'$t_{s}$ [fm]')
-    #     axs[irow,2].set_xlabel(r'$t_{s}^{\rm low}$ [fm]')
-    #     axs[irow,3].set_xlabel(r'$t_{s}^{\rm low}$ [fm]')
+            def plot_fits(show,fits,tfmins,tcmins,fit_MA):
+                show_prob=show+'_prob'
+                if show in shows and fits is not None:
+                    ax=axs[irow,shows.index(show)]
+                    if fit_MA is not None:
+                        pars_jk,probs_jk,fits_MA=fit_MA
+                        fitlabels=[fit[0] for fit in fits_MA]
+                        probs=np.mean(probs_jk,axis=0)
+                        tfs=removeDuplicates([fitlabel[0] for fitlabel in fitlabels])
+                        mean,err=jackme(pars_jk[:,0])
+                        plt_y=mean*yunit; plt_yerr=err*yunit
+                        ax.axhspan(plt_y-plt_yerr,plt_y+plt_yerr,color='r',alpha=0.2,label=un2str(plt_y,plt_yerr))
+                        ax.legend()
+                        if show_prob in shows:
+                            axp=axs[irow,shows.index(show_prob)]
+                            axp.axhspan(plt_y-plt_yerr,plt_y+plt_yerr,color='r',alpha=0.2)
+                    for fit in fits:
+                        (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fit
+                        if tfmin not in tfmins or tcmin not in tcmins:
+                            continue
+                        itcmin=tcmins.index(tcmin)
+                        mfc=None
+                        if fit_MA is not None and (tfmin,tcmin) in fitlabels:
+                            mfc='white'
+                        mean,err=jackme(pars_jk[:,0])
+                        plt_x=(tfmin+itcmin*0.1)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
+                        ax.errorbar(plt_x,plt_y,plt_yerr,color=colors_fit[itcmin],fmt=fmts8[itcmin%8],mfc=mfc)
+                        
+                        if show_prob in shows and (tfmin,tcmin) in fitlabels:
+                            ind=fitlabels.index((tfmin,tcmin))
+                            prob=probs[ind]
+                            if prob<1/100:
+                                continue
+                            mean,err=jackme(pars_jk)
+                            plt_x=(prob)*100; plt_y=mean[0]*yunit; plt_yerr=err[0]*yunit
+                            axp.errorbar(plt_x,plt_y,plt_yerr,color=colors_fit[itcmin],fmt=fmts8[itcmin%8],mfc=mfc)
 
-    #     for irow in range(len(list_dic)):
-    #         key2res={}
-            
-    #         dic=list_dic[irow]
-    #         def setParameter(default,key):
-    #             return dic[key] if key in dic else default
-            
-    #         xunit=setParameter(1,'xunit')
-    #         yunit=setParameter(1,'yunit')
-    #         tcmin_rainbow=setParameter(1,'tcmin_rainbow')
-    #         tcmin_fit=setParameter(1,'tcmin_fit')
+                    if show=='fit_2st' and 'fit_2st_rainbow_midpoint:[pars_jk_meff2st]' in dic:
+                        pars_jk_meff2st=dic['fit_2st_rainbow_midpoint:[pars_jk_meff2st]']
+                        ind_mpf=np.argmax(probs)
+                        (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fits_MA[ind_mpf]
+                        if pars_jk_meff2st is not None:
+                            pars_jk=np.array([[pars[0],pars_2pt[1],pars_2pt[2],pars[1],pars[2]] for pars,pars_2pt in zip(pars_jk,pars_jk_meff2st)])
+                        ax=axs[irow,shows.index('rainbow')]
+                        for itf,tf in enumerate(tfs_rainbow):
+                            if tf<tfmin:
+                                continue
+                            tcs=np.arange(tcmin,tf-tcmin,0.1)
+                            t=np.array([func_ratio_2st(tf,tcs,*pars) for pars in pars_jk])
+                            mean,err=jackme(t)
+                            plt_x=(tcs-tf//2)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
+                            itf_color=tfs_color.index(tf)
+                            ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color=colors_rainbow[itf_color%16],alpha=0.2)   
+                        if 'midpoint' in shows:
+                            ax=axs[irow,shows.index('midpoint')]
+                            xlim=ax.get_xlim()
+                            tfs=np.arange(xlim[0]/xunit,xlim[-1]/xunit,0.1)
+                            t=np.array([func_ratio_2st(tfs,tfs/2,*pars) for pars in pars_jk])
+                            mean,err=jackme(t)
+                            plt_x=tfs*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
+                            ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color='grey',alpha=0.2)   
 
-    #         tf2ratio=dic['tf2ratio']
-    #         tfs_rainbow=dic['tfs_rainbow']
-    #         tfs_bandfit=dic['tfs_bandfit']
-    #         tfs_sum=dic['tfs_sum']
-    #         tfmins_sum=dic['tfmins_sum']
-    #         tfs_WA=dic['tfs_WA']
-            
-    #         ax=axs[irow,0]
-    #         for itf,tf in enumerate(tfs_rainbow):
-    #             mean,err=jackme(tf2ratio[tf])
-    #             tcs=np.arange(tcmin_rainbow,tf-tcmin_rainbow+1)
-    #             plt_x=(tcs-tf/2+0.05*(itf-len(tfs_rainbow)/2))*xunit; plt_y=mean[tcs]*yunit; plt_yerr=err[tcs]*yunit
-    #             ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[itf],fmt=fmts16[itf])
+                            tfs=np.arange(tfmin,tfs_mid[-1],0.1)
+                            t=np.array([func_ratio_2st(tfs,tfs/2,*pars) for pars in pars_jk])
+                            mean,err=jackme(t)
+                            plt_x=tfs*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
+                            ax.fill_between(plt_x,plt_y-plt_yerr,plt_y+plt_yerr,color='grey',alpha=0.7) 
                 
-    #         ax=axs[irow,1]
-    #         tcmin=tcmin_fit
-    #         pars_WA=[]
-            
-    #         for i_tf,tf in enumerate(tfs_bandfit):
-    #             y_jk=tf2ratio[tf][:,tcmin:tf-tcmin+1]
-    #             pars_jk,chi2_jk,Ndof=doFit_const(y_jk,corrQ=False)
-                
-    #             if tf in tfs_WA:
-    #                 pars_WA.append(pars_jk[:,0])
-                
-    #             mean,err=jackme(pars_jk)
-    #             plt_x=tf*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-    #             ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[i_tf],mfc='white' if tf in tfs_WA else None)
-            
-    #         y_jk=np.transpose(pars_WA)
-    #         pars_jk,chi2_jk,Ndof=doFit_const(y_jk,corrQ=False)
-    #         key2res['bandfit_WA']=pars_jk[:,0]
-    #         mean_wa,err_wa=jackme(pars_jk)
-                
-    #         ax=axs[irow,2]
-    #         tfmins=tfmins_sum
-    #         tcmins=[tcmin]
-    #         fits=doFit_3pt_sum(tf2ratio,tfmins,tcmins)
-    #         for fit in fits:
-    #             (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fit
-    #             mean,err=jackme(pars_jk[:,0])
-    #             plt_x=tfmin*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-    #             ax.errorbar(plt_x,plt_y,plt_yerr,color='g')  
-    #         key2res['sum_first']=fits[0][1][:,0]
-            
-    #         plt_y=mean_wa[0]*yunit; plt_yerr=err_wa[0]*yunit
-    #         axs[irow,0].set_ylim([plt_y-plt_yerr*16,plt_y+plt_yerr*16])
-    #         for i in [0,1]:
-    #             axs[irow,i].set_xlim(axs[irow,i].get_xlim())
-    #             axs[irow,i].fill_between(axs[irow,i].get_xlim(),plt_y-plt_yerr,plt_y+plt_yerr,color='grey',alpha=0.2,label=un2str(plt_y,plt_yerr))  
-    #         axs[irow,1].legend() 
-            
-    #         pars_jk,probs_jk=jackMA(fits)
-    #         key2res['sum_MA']=pars_jk[:,0]
-    #         mean,err=jackme(pars_jk[:,0])
-    #         plt_y=mean*yunit; plt_yerr=err*yunit
-    #         axs[irow,2].fill_between(axs[irow,2].get_xlim(),plt_y-plt_yerr,plt_y+plt_yerr,color='green',alpha=0.2,label=un2str(plt_y,plt_yerr))  
-    #         axs[irow,2].legend() 
-            
-
-            
-    #         ax=axs[irow,3]
-    #         tcmins_color=[2,3,4,5,6,7,8,9]
-    #         tfmins=dic['tfmins_const']
-    #         tcmins=dic['tcmins_const']
-    #         fits=doFit_3pt_1st(tf2ratio,tfmins,tcmins,symmetrizeQ=True)
-    #         for fit in fits:
-    #             (tfmin,tcmin),pars_jk,chi2_jk,Ndof=fit
-    #             mean,err=jackme(pars_jk[:,0])
-    #             plt_x=(tfmin+tcmin*0.1)*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-    #             ax.errorbar(plt_x,plt_y,plt_yerr,color=colors8[tcmins_color.index(tcmin)])  
-    #         pars_jk,probs_jk=jackMA(fits)
-    #         key2res['const_MA']=pars_jk[:,0]
-    #         mean,err=jackme(pars_jk[:,0])
-    #         plt_y=mean*yunit; plt_yerr=err*yunit
-    #         axs[irow,3].set_xlim(axs[irow,3].get_xlim())
-    #         axs[irow,3].fill_between(axs[irow,3].get_xlim(),plt_y-plt_yerr,plt_y+plt_yerr,color='pink',alpha=0.2,label=un2str(plt_y,plt_yerr))  
-    #         axs[irow,3].legend() 
-            
-    #         result.append(key2res)
-    #     return fig,axs,result
-
-    
-    # def makePlot_3pt_KyliakosStyle(list_dic):
-    #     result=[]
-    #     fig, axs = getFigAxs(len(list_dic),3,Lrow=4,Lcol=6,sharex='col',sharey='row', gridspec_kw={'width_ratios': [3, 2, 2]})
-    #     irow=-1
-    #     axs[irow,0].set_xlabel(r'$t_{\rm ins}-t_{s}/2$ [fm]')        
-    #     axs[irow,1].set_xlabel(r'$t_{s}$ [fm]')
-    #     axs[irow,2].set_xlabel(r'$t_{s}^{\rm low}$ [fm]')
-        
-    #     # colors=['b','orange','g','r','purple','brown','magenta','gold','cyan']
-    #     for irow in range(len(list_dic)):
-    #         dic=list_dic[irow]
-    #         def setParameter(default,key):
-    #             return dic[key] if key in dic else default
-            
-    #         xunit=setParameter(1,'xunit')
-    #         yunit=setParameter(1,'yunit')
-    #         tcmin_rainbow=setParameter(1,'tcmin_rainbow')
-    #         tcmin_fit=setParameter(1,'tcmin_fit')
-
-    #         tf2ratio=dic['tf2ratio']
-    #         tfs_rainbow=dic['tfs_rainbow']
-    #         tfs_bandfit=dic['tfs_bandfit']
-    #         tfs_sum=dic['tfs_sum']
-    #         tfmins_sum=dic['tfmins_sum']
-    #         tfs_wa=dic['tfs_wa']
-            
-    #         ax=axs[irow,0]
-    #         for itf,tf in enumerate(tfs_rainbow):
-    #             mean,err=jackme(tf2ratio[tf])
-    #             tcs=np.arange(tcmin_rainbow,tf-tcmin_rainbow+1)
-    #             plt_x=(tcs-tf/2+0.05*(itf-len(tfs_rainbow)/2))*xunit; plt_y=mean[tcs]*yunit; plt_yerr=err[tcs]*yunit
-    #             ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[itf],fmt=fmts16[itf])
-                
-    #         ax=axs[irow,1]
-    #         tcmin=tcmin_fit
-    #         pars_WA=[]
-            
-    #         for i_tf,tf in enumerate(tfs_bandfit):
-    #             y_jk=tf2ratio[tf][:,tcmin:tf-tcmin+1]
-    #             def fitfunc(pars):
-    #                 return list(pars)*(tf-2*tcmin+1)
-    #             pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,[0.04])
-                
-    #             if tf in tfs_wa:
-    #                 pars_WA.append(pars_jk[:,0])
-                
-    #             mean,err=jackme(pars_jk)
-    #             plt_x=tf*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-    #             ax.errorbar(plt_x,plt_y,plt_yerr,color=colors16[i_tf],mfc='white' if tf in tfs_wa else None) 
-                
-    #         ax=axs[irow,2]
-    #         tfmins=tfmins_sum
-    #         ratioSummedDic={tf:np.sum(tf2ratio[tf][:,tcmin:tf-tcmin+1],axis=1) for tf in tfs_sum}
-    #         for tfmin in tfmins:
-    #             y_jk=np.transpose([ratioSummedDic[tf] for tf in tfs_sum if tf>=tfmin])
-    #             num=y_jk.shape[1]
-    #             def fitfunc(pars):
-    #                 g,c=pars
-    #                 return g*np.arange(num)+c
-    #             pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,y_jk,[0.04,1])
-                
-    #             mean,err=jackme(pars_jk[:,0])
-    #             plt_x=tfmin*xunit; plt_y=mean*yunit; plt_yerr=err*yunit
-    #             ax.errorbar(plt_x,plt_y,plt_yerr,color='g')  
-                
-    #         pars_WA=np.transpose(pars_WA)
-    #         def fitfunc(pars):
-    #             return list(pars)*len(pars_WA[0])
-    #         pars_jk,chi2_jk,Ndof,Nwarning=jackfit(fitfunc,pars_WA,[0.04],mask='uncorrelated')
-    #         result.append(pars_jk)
-    #         mean_wa,err_wa=jackme(pars_jk)
-                
-    #         plt_y=mean_wa[0]*yunit; plt_yerr=err_wa[0]*yunit
-    #         for i in [0,1,2]:
-    #             axs[irow,i].set_xlim(axs[0,i].get_xlim())
-    #             axs[irow,i].fill_between(axs[0,i].get_xlim(),plt_y-plt_yerr,plt_y+plt_yerr,color='grey',alpha=0.2,label=un2str(plt_y,plt_yerr))  
-    #         axs[irow,1].legend()
-        
-    #     return fig,axs,result
-        
+            plot_fits('fit_const',fits_const,tfmins_const,tcmins_const,fit_const_MA)
+            plot_fits('fit_sum',fits_sum,tfmins_sum,tcmins_sum,fit_sum_MA)
+            plot_fits('fit_2st',fits_2st,tfmins_2st,tcmins_2st,fit_2st_MA)
+                                  
+        return fig,axs
+                   
 #!============== GEVP ==============#
 if True:
     def GEVP(Ct,t0List,tList=None,tvList=None):
@@ -1701,211 +1346,6 @@ if True:
 
     ens2aInv={ens:1/(ens2a[ens]*hbarc) for ens in ens2a.keys()} # MeV
 
-#!============== moments ==============#
-if True:
-    j2j1={
-        'jq':[[1,'j+'],[1,'js'],[1,'jc']],
-        'jv1':[[1,'j-']],
-        'jv2':[[1,'j+'],[-2,'js']],
-        'jv3':[[1,'j+'],[1,'js'],[-3,'jc']]
-    }
-    fla2iso={
-        'u':[(1/4,'q'),(1/2,'v1'),(1/6,'v2'),(1/12,'v3')],
-        'd':[(1/4,'q'),(-1/2,'v1'),(1/6,'v2'),(1/12,'v3')],
-        's':[(1/4,'q'),(-1/3,'v2'),(1/12,'v3')],
-        'c':[(1/4,'q'),(-1/4,'v3')]
-    }
-    fla2iso_conn={
-        'u':[(1/2,'q'),(1/2,'v1')],
-        'd':[(1/2,'q'),(-1/2,'v1')],
-    }
-    
-    lat_a2s_plt=np.arange(0,0.009,0.001)
-    
-    def extendBare_avgx(key2bare):
-        keys=list(key2bare)
-        enss=removeDuplicates([ens for ens,j in keys])
-        stouts=removeDuplicates([int(j.split('stout')[-1]) for ens,j in keys if 'stout' in j])
-        
-        for ens in enss:
-            ZERO=key2bare[(ens,'j+;conn')]*0
-            key2bare[(ens,'js;conn')]=ZERO
-            key2bare[(ens,'jc;conn')]=ZERO
-            key2bare[(ens,'j-;disc')]=ZERO
-            for cd in ['conn','disc']:
-                for j in j2j1.keys():
-                    key2bare[(ens,f'{j};{cd}')]=np.sum([factor*key2bare[(ens,f'{j1};{cd}')] for factor,j1 in j2j1[j]],axis=0)
-            
-    def bareRC2phy_avgx(key2bare,ens2RCs,mn_conn='mu=nu',mn_disc='mu!=nu',mn_g='mu!=nu'):
-        keys=list(key2bare)
-        enss=removeDuplicates([ens for ens,j in keys])
-        stouts=removeDuplicates([int(j.split('stout')[-1]) for ens,j in keys if 'stout' in j])
-        
-        key2phy={}
-        for ens in enss:
-            for j in ['jv1','jv2','jv3']:
-                key2phy[(ens,f'{j};conn')]=ens2RCs[ens][f'Zqq({mn_conn})']*key2bare[(ens,f'{j};conn')]
-                key2phy[(ens,f'{j};disc')]=ens2RCs[ens][f'Zqq({mn_disc})']*key2bare[(ens,f'{j};disc')]
-                key2phy[(ens,f'{j}')]=key2phy[(ens,f'{j};conn')]+key2phy[(ens,f'{j};disc')]
-                
-            for stout in stouts:
-                key2phy[(ens,f'jq;conn;stout{stout}')]=ens2RCs[ens][f'Zqq^s({mn_conn})']*key2bare[(ens,'jq;conn')]
-                key2phy[(ens,f'jq;disc;stout{stout}')]=ens2RCs[ens][f'Zqq^s({mn_disc})']*key2bare[(ens,'jq;disc')]
-                key2phy[(ens,f'jq;0mix;stout{stout}')]=key2phy[(ens,f'jq;conn;stout{stout}')]+key2phy[(ens,f'jq;disc;stout{stout}')]
-                
-                key2phy[(ens,f'jq;mix;stout{stout}')]=ens2RCs[ens][f'Zqg({mn_g})']*key2bare[(ens,f'jg;stout{stout}')]
-                key2phy[(ens,f'jq;stout{stout}')]=key2phy[(ens,f'jq;0mix;stout{stout}')]+key2phy[(ens,f'jq;mix;stout{stout}')]
-                
-                key2phy[(ens,f'jg;0mix;stout{stout}')]=ens2RCs[ens][f'Zgg^{stout}({mn_g})']*key2bare[(ens,f'jg;stout{stout}')]
-                key2phy[(ens,f'jg;mix;stout{stout}')]=ens2RCs[ens][f'Zgq({mn_conn})']*key2bare[(ens,'jq;conn')]+ens2RCs[ens][f'Zgq({mn_disc})']*key2bare[(ens,'jq;disc')]
-                key2phy[(ens,f'jg;stout{stout}')]=key2phy[(ens,f'jg;mix;stout{stout}')]+key2phy[(ens,f'jg;0mix;stout{stout}')]
-                
-                key2phy[(ens,f'jtot;stout{stout}')]=key2phy[(ens,f'jq;stout{stout}')]+key2phy[(ens,f'jg;stout{stout}')]
-                
-                for fla in fla2iso.keys():
-                    key2phy[(ens,f'j{fla};stout{stout}')]=np.sum([factor*(key2phy[(ens,f'j{iso};stout{stout}')] if iso in ['q'] else key2phy[(ens,f'j{iso}')])  for factor,iso in fla2iso[fla]],axis=0)
-        
-        for j in ['jv1','jv2','jv3']+[f'jq;stout{stout}' for stout in stouts]+[f'jg;stout{stout}' for stout in stouts]:
-            ens2dat={ens:key2phy[(ens,j)] for ens in enss}
-            fits=doFit_continuumExtrapolation(ens2dat,lat_a2s_plt=lat_a2s_plt)
-            for fit in fits:
-                fitlabel,pars_jk,chi2_jk,Ndof=fit
-                key2phy[(f'a=#_{fitlabel}',j)]=pars_jk
-            pars_jk,probs_jk=jackMA(fits)
-            key2phy[('a=#_MA',j)]=pars_jk
-        
-        for stout in stouts:
-            for fitlabel in ['const','linear','MA']:
-                for fla in fla2iso.keys():
-                    key2phy[(f'a=#_{fitlabel}',f'j{fla};stout{stout}')]=np.sum([factor*(key2phy[(f'a=#_{fitlabel}',f'j{iso};stout{stout}')] if iso in ['q'] else key2phy[(f'a=#_{fitlabel}',f'j{iso}')]) for factor,iso in fla2iso[fla]],axis=0)
-                key2phy[(f'a=#_{fitlabel}',f'jtot;stout{stout}')]=key2phy[(f'a=#_{fitlabel}',f'jq;stout{stout}')]+key2phy[(f'a=#_{fitlabel}',f'jg;stout{stout}')]
-        
-        return key2phy
-    
-    def bareRC2phy_avgx_pre(key2bare,ens2RCs,ens2RCs_pre,mn_conn='mu=nu',mn_disc='mu!=nu',mn_g='mu!=nu'):
-        keys=list(key2bare)
-        enss=removeDuplicates([ens for ens,j in keys]); enss=['b']
-        stouts=removeDuplicates([int(j.split('stout')[-1]) for ens,j in keys if 'stout' in j])
-        
-        key2phy={}
-        for ens in enss:
-            for j in ['jv1','jv2','jv3']:
-                key2phy[(ens,f'{j};conn')]=ens2RCs[ens][f'Zqq({mn_conn})']*key2bare[(ens,f'{j};conn')]
-                key2phy[(ens,f'{j};disc')]=ens2RCs[ens][f'Zqq({mn_disc})']*key2bare[(ens,f'{j};disc')]
-                key2phy[(ens,f'{j}')]=key2phy[(ens,f'{j};conn')]+key2phy[(ens,f'{j};disc')]
-                
-            for stout in stouts:
-                key2phy[(ens,f'jq;conn;stout{stout}')]=ens2RCs[ens][f'Zqq^s({mn_conn})']*key2bare[(ens,'jq;conn')]
-                key2phy[(ens,f'jq;disc;stout{stout}')]=ens2RCs_pre[ens][f'Zqq^s^{stout}({mn_disc})']*key2bare[(ens,'jq;disc')]
-                key2phy[(ens,f'jq;0mix;stout{stout}')]=key2phy[(ens,f'jq;conn;stout{stout}')]+key2phy[(ens,f'jq;disc;stout{stout}')]
-                
-                key2phy[(ens,f'jq;mix;stout{stout}')]=ens2RCs_pre[ens][f'Zqg^{stout}({mn_g})']*key2bare[(ens,f'jg;stout{stout}')]
-                key2phy[(ens,f'jq;stout{stout}')]=key2phy[(ens,f'jq;0mix;stout{stout}')]+key2phy[(ens,f'jq;mix;stout{stout}')]
-                
-                key2phy[(ens,f'jg;0mix;stout{stout}')]=ens2RCs_pre[ens][f'Zgg^{stout}({mn_g})']*key2bare[(ens,f'jg;stout{stout}')]
-                key2phy[(ens,f'jg;mix;stout{stout}')]=ens2RCs[ens][f'Zgq({mn_conn})']*key2bare[(ens,'jq;conn')]+ens2RCs_pre[ens][f'Zgq^{stout}({mn_disc})']*key2bare[(ens,'jq;disc')]
-                key2phy[(ens,f'jg;stout{stout}')]=key2phy[(ens,f'jg;mix;stout{stout}')]+key2phy[(ens,f'jg;0mix;stout{stout}')]
-                
-                key2phy[(ens,f'jtot;stout{stout}')]=key2phy[(ens,f'jq;stout{stout}')]+key2phy[(ens,f'jg;stout{stout}')]
-                
-                for fla in fla2iso.keys():
-                    key2phy[(ens,f'j{fla};stout{stout}')]=np.sum([factor*(key2phy[(ens,f'j{iso};stout{stout}')] if iso in ['q'] else key2phy[(ens,f'j{iso}')])  for factor,iso in fla2iso[fla]],axis=0)        
-        
-        return key2phy
-
-    def convert_key2phy_stout(key2phy_old,stout):
-        key2phy={}
-        for key in key2phy_old.keys():
-            ens,j=key
-            if j.endswith(f';stout{stout}'):
-                key2phy[(ens,j.removesuffix(f';stout{stout}'))]=key2phy_old[key]
-            if 'stout' not in j:
-                key2phy[key]=key2phy_old[key]
-        return key2phy                
-    
-    def makePlot_a2dependence_avgx(list_dic):
-        Ncol=len(list_dic)
-        fig, axs = getFigAxs(2,Ncol,Lrow=4,Lcol=6,sharex=True,sharey='row')
-        ax=axs[0,0]
-        ax.set_xlim([0,lat_a2s_plt[-1]])
-        ax.set_xticks([0,0.003,0.006])
-        ax.set_ylim([0.2,1.4])
-        ax.set_yticks([0.4,0.6,0.8,1.0,1.2])
-        ax.set_ylabel(r'$\langle \mathrm{x} \rangle_{q,g}$')
-        ax=axs[1,0]
-        ax.set_ylim([-0.1,0.5])
-        ax.set_ylabel(r'$\langle \mathrm{x}\rangle_{q}$')
-        for icol in range(Ncol):
-            axs[0,icol].axhline(1,color='black',ls='--',marker='')
-            axs[0,icol].axvline(0,color='black',ls='dotted',marker='')
-            axs[1,icol].set_xlabel(r'$a^2$ [fm$^2$]')
-            axs[1,icol].axhline(0,color='black',ls='--',marker='')
-            
-        for icol in range(Ncol):
-            dic=list_dic[icol]
-            def setParameter(default,key):
-                return dic[key] if key in dic else default
-            
-            key2phy=dic['key2phy']
-            key2phy_pre=setParameter(None,'key2phy_pre')
-            
-            keys=list(key2phy)
-            enss=removeDuplicates([ens for ens,j in keys if 'a=#' not in ens])
-            
-            def get(ens,j):
-                return key2phy[(ens,j)]
-            def get_pre(ens,j):
-                return key2phy_pre[(ens,j)]
-            
-            j2color={'jq':'purple','jg':'cyan','jtot':'grey','ju':'r','jd':'g','js':'b','jc':'orange'}
-            j2label={'jq':'q','jg':'g','jtot':'N','ju':'u','jd':'d','js':'s','jc':'c'}
-            j2fmt={'jq':'d','jg':'s','jtot':'o','ju':'^','jd':'v','js':'<','jc':'>'}
-            
-            
-            ax=axs[0,icol]
-            js=['jq','jtot','jg']
-            for ij,j in enumerate(js):
-                color=j2color[j]
-                mean,err=jackme(get('a=#_MA',j))
-                label=rf'$\langle x\rangle _{{{j2label[j]}}}=$'+un2str(mean[0],err[0],forceResult=1)
-                for iens,ens in enumerate(enss):
-                    plt_x=ens2a[ens]**2+(ij-len(js)/2)*5e-5; plt_y,plt_yerr=jackme(get(ens,j))
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=color,fmt=j2fmt[j],label=label if iens==0 else None)
-                    
-                    if key2phy_pre is None or ens not in ['b']:
-                        continue
-                    plt_x=ens2a[ens]**2+0.0001; plt_y,plt_yerr=jackme(get_pre(ens,j))
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=color,fmt=j2fmt[j],mfc='white')
-                        
-
-                mean,err=jackme(get('a=#_MA',j))
-                x=lat_a2s_plt; ymin=mean-err; ymax=mean+err
-                ax.plot(x,mean,color=color,linestyle='--',marker='')
-                ax.fill_between(x, ymin, ymax, color=color, alpha=0.1)
-            ax.legend(fontsize=10,ncol=2)
-
-            ax=axs[1,icol]
-            js=['ju','jd','js','jc']
-            for ij,j in enumerate(js):
-                color=j2color[j]
-                mean,err=jackme(get('a=#_MA',j))
-                label=rf'$\langle x\rangle _{{{j2label[j]}}}=$'+un2str(mean[0],err[0],forceResult=1)
-                for iens,ens in enumerate(enss):
-                    plt_x=ens2a[ens]**2+(ij-len(js)/2)*5e-5; plt_y,plt_yerr=jackme(get(ens,j))
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=color,fmt=j2fmt[j],label=label if iens==0 else None)
-                    if key2phy_pre is None or ens not in ['b']:
-                        continue
-                    plt_x=ens2a[ens]**2+0.0001; plt_y,plt_yerr=jackme(get_pre(ens,j))
-                    ax.errorbar(plt_x,plt_y,plt_yerr,color=color,fmt=j2fmt[j],mfc='white')
-
-                mean,err=jackme(get('a=#_MA',j))
-                x=lat_a2s_plt; ymin=mean-err; ymax=mean+err
-                ax.plot(x,mean,color=color,linestyle='--',marker='')
-                ax.fill_between(x, ymin, ymax, color=color, alpha=0.1)
-            ax.legend(fontsize=10,ncol=2)
-        
-        return fig,axs
-    
 #!============== obsolete  ==============#
 if False:
     app_init=[['pi0i',{'pib'}],['pi0f',{'pia'}],['j',{'j'}],['P',{'pia','pib'}],\
