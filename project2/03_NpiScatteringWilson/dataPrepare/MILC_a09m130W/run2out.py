@@ -4,7 +4,7 @@ cat data_aux/cfgs_run | xargs -I @ -P 10 python3 -u run2out.py -c @ > log/run2ou
 import os, click, h5py, re, pickle
 import numpy as np
 
-runPath='/capstor/store/cscs/userlab/lp139/lyan/code/projectData/03_NpiScatteringWilson/MILC_a09m130W/'
+runPath='/capstor/store/cscs/userlab/s1174/lyan/code/scratch/run/03_NpiScatteringWilson/MILC_a09m130W/'
 
 lat_L,lat_T=64,96
 

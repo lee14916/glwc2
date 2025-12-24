@@ -38,6 +38,6 @@ def run():
         for cont in conts:
             fw.create_dataset(f'data/{cont}',data=data[cont])
         
-
+    print('Done!')
     
 run()
